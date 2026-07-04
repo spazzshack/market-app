@@ -47,7 +47,7 @@ def connect_to_google_sheets():
 
 wb = connect_to_google_sheets()
 
-# --- LOAD INVENTORY (WITH ERROR PROTECTION) ---
+# --- LOAD INVENTORY (WITH ERROR PROTECTION & COMPONENT COST) ---
 @st.cache_data(ttl=60)
 def load_inventory():
     if not wb: return {}
@@ -60,7 +60,8 @@ def load_inventory():
     return {item["Product"]: {
         "weight": safe_float(item["Weight"]), 
         "time": safe_float(item["Time"]), 
-        "labor": safe_float(item["Labor"])
+        "labor": safe_float(item["Labor"]),
+        "comp": safe_float(item.get("Component Cost", 0))
     } for item in data}
 
 products = load_inventory()
@@ -86,16 +87,20 @@ with main_col1:
         w = products[current_product]["weight"]
         t = products[current_product]["time"]
         l = products[current_product]["labor"]
+        comp = products[current_product]["comp"]
         
-        # --- NEW PRICING MATH: $20/1000g = $0.02/g ---
+        # --- PRICING MATH ---
+        # $20 per 1000g = $0.02 per gram
         material_cost = w * 0.02
         power_cost = t * 0.02 
-        total_item_cost = material_cost + power_cost
+        
+        # Total cost includes material, power, AND the purchased component
+        total_item_cost = material_cost + power_cost + comp
         
         # 80% Margin formula: Cost / 0.20
         target_price = round((total_item_cost / 0.20) + l)
         
-        st.metric("Suggested Price", f"${target_price}", help="Calculated at 80% Profit Margin")
+        st.metric("Suggested Price", f"${target_price}", help="Calculated at 80% Profit Margin including component costs")
         price = st.number_input("Sale Price ($)", value=int(target_price))
         qty = st.number_input("Quantity", min_value=1, value=1)
         
@@ -114,7 +119,6 @@ with main_col2:
             for item in st.session_state['cart']:
                 total_cost = round(item["Qty"] * item["Cost"], 2)
                 total_rev = item["Qty"] * item["Price"]
-                # Save: Date, Product, Qty, Payment, Cost, Paid, Profit
                 sales_sheet.append_row([str(datetime.date.today()), item["Product"], item["Qty"], pay_type, total_cost, total_rev, total_rev - total_cost])
             st.session_state['cart'] = []
             st.balloons()
