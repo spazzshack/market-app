@@ -21,7 +21,7 @@ def get_base64_image(image_path):
 
 image_code = get_base64_image(IMAGE_PATH)
 
-# CSS for Background and 3-Wide Aligned "Pill" Buttons
+# CSS for 3-Wide Pill Buttons and Layout Fixes
 st.markdown(f"""
     <style>
     .stApp {{
@@ -33,24 +33,25 @@ st.markdown(f"""
     }}
     h1, h2, h3, p, div {{ color: white !important; }}
     
-    /* --- 3-WIDE PILL STYLING --- */
+    /* --- FIXED 3-WIDE PILL STYLING --- */
     div[role="radiogroup"] {{
         display: flex;
         flex-direction: row;
         flex-wrap: wrap;
-        justify-content: center;
-        gap: 15px;
+        justify-content: flex-start;
+        gap: 10px;
         margin-bottom: 25px;
     }}
     div[role="radiogroup"] > label {{
         background-color: rgba(255, 255, 255, 0.1);
-        padding: 12px 0;
-        border-radius: 12px;
+        padding: 10px 5px;
+        border-radius: 10px;
         border: 1px solid rgba(255, 255, 255, 0.3);
         cursor: pointer;
-        /* Forces 3 wide: 30% width minus the gap */
-        flex: 0 0 30%; 
+        /* Set to 31% to force 3 per row (31 * 3 = 93%) */
+        flex: 0 0 31%; 
         text-align: center;
+        font-size: 0.9rem;
     }}
     div[role="radiogroup"] > label:hover {{ background-color: rgba(255, 255, 255, 0.2); }}
     div[role="radiogroup"] input[type="radio"] {{ display: none; }}
@@ -75,7 +76,7 @@ def connect_to_google_sheets():
 
 wb = connect_to_google_sheets()
 
-# --- LOAD INVENTORY FUNCTION ---
+# --- LOAD INVENTORY ---
 @st.cache_data(ttl=60)
 def load_inventory():
     if not wb: return {}
@@ -92,21 +93,20 @@ def load_inventory():
         "category": item.get("Category", "General")
     } for item in data}
 
-# --- INITIALIZE STATE ---
 if 'cart' not in st.session_state: st.session_state['cart'] = []
 
 # --- UI LAYOUT ---
 st.title("🖨️ Spazz Shack")
-
 products = load_inventory()
-all_prods = products
 
-main_col1, main_col2 = st.columns([4, 3], gap="large")
+# Use fixed column ratios to prevent "shunting"
+main_col1, main_col2 = st.columns([0.6, 0.4])
 
 with main_col1:
     st.markdown("### 🛍️ Quick-Add Inventory")
+    all_prods = products
     categories = sorted(list(set(p["category"] for p in all_prods.values())))
-    selected_cat = st.radio("Filter by Category", categories, horizontal=True, label_visibility="collapsed")
+    selected_cat = st.radio("Categories", categories, horizontal=True, label_visibility="collapsed")
     
     filtered_prods = {k: v for k, v in all_prods.items() if v["category"] == selected_cat}
     
@@ -145,8 +145,7 @@ with main_col2:
         fee = 0.0
         if pay_type != "Cash":
             add_fee = st.checkbox(f"Add 3% Processing Fee?", value=False)
-            if add_fee: 
-                fee = running_total * 0.03
+            if add_fee: fee = running_total * 0.03
         st.metric("Total Due", f"${(running_total + fee):.2f}")
         if st.button("💾 Checkout"):
             sales_sheet = wb.worksheet("Sales")
