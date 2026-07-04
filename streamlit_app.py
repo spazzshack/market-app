@@ -16,18 +16,6 @@ def get_base64_image(image_path):
             return base64.b64encode(img_file.read()).decode()
     return None
 
-image_code = get_base64_image("logo.png") or get_base64_image("static/logo.png")
-bg_style = f'background-image: linear-gradient(rgba(15, 23, 42, 0.90), rgba(15, 23, 42, 0.90)), url("data:image/png;base64,{image_code}");' if image_code else "background-color: #0f172a;"
-
-st.markdown(f"""
-    <style>
-    .stApp {{ {bg_style} background-size: cover; background-position: center; background-attachment: fixed; }}
-    div.stButton > button:first-child {{ border-radius: 12px; font-weight: 700; background-color: #1e293b; border: 2px solid #334155; color: #f8fafc; transition: 0.2s; }}
-    div.stButton > button:first-child:hover {{ border-color: #10b981; color: #10b981; }}
-    .metric-box {{ background-color: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; }}
-    </style>
-""", unsafe_allow_html=True)
-
 # --- GOOGLE SHEETS CONNECTION ---
 @st.cache_resource
 def connect_to_google_sheets():
@@ -59,7 +47,8 @@ def load_inventory():
         "weight": safe_float(item["Weight"]), 
         "time": safe_float(item["Time"]), 
         "labor": safe_float(item["Labor"]),
-        "comp": safe_float(item.get("Component Cost", 0))
+        "comp": safe_float(item.get("Component Cost", 0)),
+        "target": safe_float(item.get("Target Price", 0))
     } for item in data}
 
 products = load_inventory()
@@ -84,12 +73,13 @@ with main_col1:
         total_make_cost = printing_cost + data["comp"]
         suggested_price = (printing_cost / 0.20) + data["comp"] + data["labor"]
         
-        st.markdown(f"<div class='metric-box'><strong>Active:</strong> {current_product}</div>", unsafe_allow_html=True)
+        st.markdown(f"**Active:** {current_product}")
         c1, c2 = st.columns(2)
         c1.metric("Cost to Make", f"${total_make_cost:.2f}")
         c2.metric("Suggested Price", f"${suggested_price:.2f}")
         
-        price = st.number_input("Final Sale Price ($)", value=int(suggested_price))
+        default_price = data["target"] if data["target"] > 0 else int(suggested_price)
+        price = st.number_input("Final Sale Price ($)", value=default_price)
         qty = st.number_input("Quantity", min_value=1, value=1)
         
         if st.button("🛒 Add to Cart", type="primary"):
@@ -113,18 +103,17 @@ with main_col2:
         st.metric("Total Due", f"${(running_total + fee):.2f}")
         
         if st.button("💾 Checkout"):
+            js_code = "<script>var audio = new Audio('https://actions.google.com/sounds/v1/ui/gameshow_correct_answer.ogg'); audio.play();</script>"
+            st.components.v1.html(js_code, height=0)
+            
             sales_sheet = wb.worksheet("Sales")
             for item in st.session_state['cart']:
                 data = products[item["Product"]]
                 cost_per_item = ((data["weight"] * 0.02) + (data["time"] * 0.02) + data["comp"])
                 total_row_cost = round(item["Qty"] * cost_per_item, 2)
-                
-                # If paying by card, assign a portion of the fee to this specific row
                 item_fee = (fee / len(st.session_state['cart'])) if fee > 0 else 0
-                
                 total_rev = item["Qty"] * item["Sale Price"]
                 profit = total_rev - total_row_cost - item_fee
-                
                 sales_sheet.append_row([str(datetime.date.today()), item["Product"], item["Qty"], pay_type, total_row_cost, total_rev, round(profit, 2), round(item_fee, 2)])
             
             st.session_state['cart'] = []
