@@ -68,7 +68,17 @@ st.markdown(f"""
 def connect_to_google_sheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name("C:/Users/adamq/desktop/market-app/google_creds.json", scope)
+        
+        # Check if we are on the cloud (where we saved the secrets)
+        if "gcp_service_account" in st.secrets:
+            # WEB DEPLOYMENT: Use the secrets vault
+            import json
+            creds_dict = dict(st.secrets["gcp_service_account"])
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        else:
+            # LOCAL DESKTOP: Use the file path
+            creds = ServiceAccountCredentials.from_json_keyfile_name("C:/Users/adamq/desktop/market-app/google_creds.json", scope)
+            
         client = gspread.authorize(creds)
         sheet = client.open("3D Printing Market Sales").sheet1
         return sheet
