@@ -79,15 +79,12 @@ with main_col1:
 
     current_product = st.session_state.get('selected_product', None)
     if current_product:
-        w, t, l, comp = products[current_product]["weight"], products[current_product]["time"], products[current_product]["labor"], products[current_product]["comp"]
-        
-        printing_cost = (w * 0.02) + (t * 0.02)
-        total_make_cost = printing_cost + comp
-        suggested_price = (printing_cost / 0.20) + comp + l
+        data = products[current_product]
+        printing_cost = (data["weight"] * 0.02) + (data["time"] * 0.02)
+        total_make_cost = printing_cost + data["comp"]
+        suggested_price = (printing_cost / 0.20) + data["comp"] + data["labor"]
         
         st.markdown(f"<div class='metric-box'><strong>Active:</strong> {current_product}</div>", unsafe_allow_html=True)
-        
-        # Display Cost and Price side-by-side
         c1, c2 = st.columns(2)
         c1.metric("Cost to Make", f"${total_make_cost:.2f}")
         c2.metric("Suggested Price", f"${suggested_price:.2f}")
@@ -105,20 +102,31 @@ with main_col2:
         df = pd.DataFrame(st.session_state['cart'])
         st.table(df)
         
-        # Calculate Running Total
         running_total = df["Total"].sum()
-        st.metric("Total Due", f"${running_total:.2f}")
+        pay_type = st.selectbox("Payment", ["Cash", "Venmo", "Square", "PayPal"])
         
-        pay_type = st.selectbox("Payment", ["Cash", "Venmo", "Square"])
+        fee = 0.0
+        if pay_type != "Cash":
+            add_fee = st.checkbox(f"Add 3% Processing Fee?", value=False)
+            if add_fee: fee = running_total * 0.03
+        
+        st.metric("Total Due", f"${(running_total + fee):.2f}")
+        
         if st.button("💾 Checkout"):
             sales_sheet = wb.worksheet("Sales")
             for item in st.session_state['cart']:
-                # Recalculate original cost for records
                 data = products[item["Product"]]
                 cost_per_item = ((data["weight"] * 0.02) + (data["time"] * 0.02) + data["comp"])
                 total_row_cost = round(item["Qty"] * cost_per_item, 2)
+                
+                # If paying by card, assign a portion of the fee to this specific row
+                item_fee = (fee / len(st.session_state['cart'])) if fee > 0 else 0
+                
                 total_rev = item["Qty"] * item["Sale Price"]
-                sales_sheet.append_row([str(datetime.date.today()), item["Product"], item["Qty"], pay_type, total_row_cost, total_rev, total_rev - total_row_cost])
+                profit = total_rev - total_row_cost - item_fee
+                
+                sales_sheet.append_row([str(datetime.date.today()), item["Product"], item["Qty"], pay_type, total_row_cost, total_rev, round(profit, 2), round(item_fee, 2)])
+            
             st.session_state['cart'] = []
             st.balloons()
             st.rerun()
