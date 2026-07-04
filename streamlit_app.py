@@ -9,7 +9,7 @@ import os
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Spazz Shack", page_icon="🖨️", layout="wide")
 
-# ... (Keep your existing path and background logic here) ...
+# Pathing setup
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 IMAGE_PATH = os.path.join(SCRIPT_DIR, "static", "logo.png")
 
@@ -21,6 +21,7 @@ def get_base64_image(image_path):
 
 image_code = get_base64_image(IMAGE_PATH)
 
+# CSS for Background and "Pill" style buttons
 st.markdown(f"""
     <style>
     .stApp {{
@@ -32,7 +33,6 @@ st.markdown(f"""
     }}
     h1, h2, h3, p, div {{ color: white !important; }}
     
-    /* --- CUSTOM BUTTON STYLING FOR RADIO --- */
     div[role="radiogroup"] > label {{
         background-color: rgba(255, 255, 255, 0.1);
         padding: 10px 20px;
@@ -41,35 +41,63 @@ st.markdown(f"""
         border: 1px solid rgba(255, 255, 255, 0.3);
         cursor: pointer;
     }}
-    div[role="radiogroup"] > label:hover {{
-        background-color: rgba(255, 255, 255, 0.2);
-    }}
-    /* Hide the little radio dots */
-    div[role="radiogroup"] input[type="radio"] {{
-        display: none;
-    }}
+    div[role="radiogroup"] > label:hover {{ background-color: rgba(255, 255, 255, 0.2); }}
+    div[role="radiogroup"] input[type="radio"] {{ display: none; }}
     </style>
 """, unsafe_allow_html=True)
 
-# ... (Keep your connection and load_inventory functions here) ...
+# --- GOOGLE SHEETS CONNECTION ---
+@st.cache_resource
+def connect_to_google_sheets():
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        if "gcp_service_account" in st.secrets:
+            import json
+            creds_dict = dict(st.secrets["gcp_service_account"])
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        else:
+            creds = ServiceAccountCredentials.from_json_keyfile_name("C:/Users/adamq/desktop/market-app/google_creds.json", scope)
+        client = gspread.authorize(creds)
+        return client.open("3D Printing Market Sales")
+    except Exception as e:
+        return None
+
+wb = connect_to_google_sheets()
+
+# --- LOAD INVENTORY FUNCTION DEFINITION ---
+@st.cache_data(ttl=60)
+def load_inventory():
+    if not wb: return {}
+    data = wb.worksheet("Inventory").get_all_records()
+    def safe_float(val):
+        try: return float(val) if str(val).strip() != "" else 0.0
+        except: return 0.0
+    return {item["Product"]: {
+        "weight": safe_float(item["Weight"]), 
+        "time": safe_float(item["Time"]), 
+        "labor": safe_float(item["Labor"]),
+        "comp": safe_float(item.get("Component Cost", 0)),
+        "target": safe_float(item.get("Target Price", 0)),
+        "category": item.get("Category", "General")
+    } for item in data}
+
+# --- INITIALIZE STATE ---
+if 'cart' not in st.session_state: st.session_state['cart'] = []
 
 # --- UI LAYOUT ---
 st.title("🖨️ Spazz Shack")
+
+# Now we call the function AFTER it is defined
+products = load_inventory()
+all_prods = products
 
 main_col1, main_col2 = st.columns([4, 3], gap="large")
 
 with main_col1:
     st.markdown("### 🛍️ Quick-Add Inventory")
-    all_prods = load_inventory()
-    categories = sorted(list(set(p["category"] for p in all_prods.values())))
     
-    # This radio group now uses our custom CSS styling
-    selected_cat = st.radio(
-        "Filter by Category", 
-        categories, 
-        horizontal=True,
-        label_visibility="collapsed"
-    )
+    categories = sorted(list(set(p["category"] for p in all_prods.values())))
+    selected_cat = st.radio("Filter by Category", categories, horizontal=True, label_visibility="collapsed")
     
     filtered_prods = {k: v for k, v in all_prods.items() if v["category"] == selected_cat}
     
@@ -77,4 +105,43 @@ with main_col1:
     for i, prod_name in enumerate(filtered_prods.keys()):
         if cols[i % 3].button(prod_name, use_container_width=True):
             st.session_state['selected_product'] = prod_name
-# ... (Rest of your existing checkout/add-to-cart logic) ...
+
+    current_product = st.session_state.get('selected_product', None)
+    if current_product and current_product in products:
+        data = products[current_product]
+        printing_cost = (data["weight"] * 0.02) + (data["time"] * 0.02)
+        total_make_cost = printing_cost + data["comp"]
+        suggested_price = (printing_cost / 0.20) + data["comp"] + data["labor"]
+        
+        st.markdown(f"**Active:** {current_product}")
+        c1, c2 = st.columns(2)
+        c1.metric("Cost to Make", f"${total_make_cost:.2f}")
+        c2.metric("Suggested Price", f"${suggested_price:.2f}")
+        
+        default_price = data["target"] if data["target"] > 0 else int(suggested_price)
+        price = st.number_input("Final Sale Price ($)", value=default_price)
+        qty = st.number_input("Quantity", min_value=1, value=1)
+        
+        if st.button("🛒 Add to Cart", type="primary"):
+            st.session_state['cart'].append({"Product": current_product, "Qty": qty, "Sale Price": price, "Total": qty * price})
+            st.rerun()
+
+with main_col2:
+    st.markdown("### 🛒 Checkout")
+    if st.session_state['cart']:
+        df = pd.DataFrame(st.session_state['cart'])
+        st.table(df)
+        running_total = df["Total"].sum()
+        pay_type = st.selectbox("Payment", ["Cash", "Venmo", "Square", "PayPal"])
+        fee = 0.0
+        if pay_type != "Cash":
+            add_fee = st.checkbox(f"Add 3% Processing Fee?", value=False)
+            if add_fee: fee = running_total * 0.03
+        st.metric("Total Due", f"${(running_total + fee):.2f}")
+        if st.button("💾 Checkout"):
+            sales_sheet = wb.worksheet("Sales")
+            for item in st.session_state['cart']:
+                data = products[item["Product"]]
+                sales_sheet.append_row([str(datetime.date.today()), item["Product"], item["Qty"], pay_type, 0, item["Total"], 0, 0])
+            st.session_state['cart'] = []
+            st.rerun()
