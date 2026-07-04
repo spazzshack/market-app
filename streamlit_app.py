@@ -47,16 +47,14 @@ def connect_to_google_sheets():
 
 wb = connect_to_google_sheets()
 
-# --- LOAD INVENTORY (WITH ERROR PROTECTION & COMPONENT COST) ---
+# --- LOAD INVENTORY ---
 @st.cache_data(ttl=60)
 def load_inventory():
     if not wb: return {}
     data = wb.worksheet("Inventory").get_all_records()
-    
     def safe_float(val):
         try: return float(val) if str(val).strip() != "" else 0.0
         except: return 0.0
-
     return {item["Product"]: {
         "weight": safe_float(item["Weight"]), 
         "time": safe_float(item["Time"]), 
@@ -69,8 +67,6 @@ if 'cart' not in st.session_state: st.session_state['cart'] = []
 
 # --- UI LAYOUT ---
 st.title("🖨️ 3D Printing Market Hub")
-if wb: st.success("🟢 Connected to Live Sheet")
-else: st.error("🔴 Cloud Sync Offline")
 
 main_col1, main_col2 = st.columns([4, 3], gap="large")
 
@@ -83,30 +79,24 @@ with main_col1:
 
     current_product = st.session_state.get('selected_product', None)
     if current_product:
-        st.markdown(f"<div class='metric-box'><strong>Active:</strong> {current_product}</div>", unsafe_allow_html=True)
-        w = products[current_product]["weight"]
-        t = products[current_product]["time"]
-        l = products[current_product]["labor"]
-        comp = products[current_product]["comp"]
+        w, t, l, comp = products[current_product]["weight"], products[current_product]["time"], products[current_product]["labor"], products[current_product]["comp"]
         
-        # --- NEW PRICING MATH ---
-        # 1. Cost of printing (Material + Power)
         printing_cost = (w * 0.02) + (t * 0.02)
-        
-        # 2. Suggested Price = (Printing Cost at 80% Margin) + Component Cost + Labor
+        total_make_cost = printing_cost + comp
         suggested_price = (printing_cost / 0.20) + comp + l
         
-        # Display the exact suggested price
-        st.metric("Suggested Retail Price", f"${suggested_price:.2f}", help="Cost of print + 80% margin + flat component cost + labor")
+        st.markdown(f"<div class='metric-box'><strong>Active:</strong> {current_product}</div>", unsafe_allow_html=True)
         
-        # Final Sale Price (User can round down manually)
+        # Display Cost and Price side-by-side
+        c1, c2 = st.columns(2)
+        c1.metric("Cost to Make", f"${total_make_cost:.2f}")
+        c2.metric("Suggested Price", f"${suggested_price:.2f}")
+        
         price = st.number_input("Final Sale Price ($)", value=int(suggested_price))
         qty = st.number_input("Quantity", min_value=1, value=1)
         
         if st.button("🛒 Add to Cart", type="primary"):
-            # We save the actual cost to the cart for profit tracking
-            total_cost = printing_cost + comp
-            st.session_state['cart'].append({"Product": current_product, "Qty": qty, "Price": price, "Cost": total_cost})
+            st.session_state['cart'].append({"Product": current_product, "Qty": qty, "Sale Price": price, "Total": qty * price})
             st.rerun()
 
 with main_col2:
@@ -114,13 +104,21 @@ with main_col2:
     if st.session_state['cart']:
         df = pd.DataFrame(st.session_state['cart'])
         st.table(df)
+        
+        # Calculate Running Total
+        running_total = df["Total"].sum()
+        st.metric("Total Due", f"${running_total:.2f}")
+        
         pay_type = st.selectbox("Payment", ["Cash", "Venmo", "Square"])
         if st.button("💾 Checkout"):
             sales_sheet = wb.worksheet("Sales")
             for item in st.session_state['cart']:
-                total_cost = round(item["Qty"] * item["Cost"], 2)
-                total_rev = item["Qty"] * item["Price"]
-                sales_sheet.append_row([str(datetime.date.today()), item["Product"], item["Qty"], pay_type, total_cost, total_rev, total_rev - total_cost])
+                # Recalculate original cost for records
+                data = products[item["Product"]]
+                cost_per_item = ((data["weight"] * 0.02) + (data["time"] * 0.02) + data["comp"])
+                total_row_cost = round(item["Qty"] * cost_per_item, 2)
+                total_rev = item["Qty"] * item["Sale Price"]
+                sales_sheet.append_row([str(datetime.date.today()), item["Product"], item["Qty"], pay_type, total_row_cost, total_rev, total_rev - total_row_cost])
             st.session_state['cart'] = []
             st.balloons()
             st.rerun()
