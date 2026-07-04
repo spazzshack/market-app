@@ -144,4 +144,12 @@ with main_col2:
         pay_type = st.selectbox("Payment", ["Cash", "Venmo", "Square", "PayPal"])
         fee = 0.0
         if pay_type != "Cash":
-            add_fee = st.checkbox(
+            add_fee = st.checkbox(f"Add 3% Processing Fee?", value=False)
+            if add_fee: fee = running_total * 0.03
+        st.metric("Total Due", f"${(running_total + fee):.2f}")
+        if st.button("💾 Checkout"):
+            sales_sheet = wb.worksheet("Sales")
+            for item in st.session_state['cart']:
+                sales_sheet.append_row([str(datetime.date.today()), item["Product"], item["Qty"], pay_type, 0, item["Total"], 0, 0])
+            st.session_state['cart'] = []
+            st.rerun()
