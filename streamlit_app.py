@@ -7,7 +7,23 @@ import base64
 import os
 
 # Page configuration
-st.set_page_config(page_title="3D Printing Market Hub", page_icon="🖨️", layout="wide")
+st.set_page_config(page_title="Spazz Shack", page_icon="🖨️", layout="wide")
+
+# --- BACKGROUND IMAGE LOGIC ---
+def get_base64_image(image_path):
+    if os.path.exists(image_path):
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    return None
+
+image_code = get_base64_image("logo.png")
+bg_style = f'background-image: linear-gradient(rgba(15, 23, 42, 0.90), rgba(15, 23, 42, 0.90)), url("data:image/png;base64,{image_code}");' if image_code else "background-color: #0f172a;"
+
+st.markdown(f"""
+    <style>
+    .stApp {{ {bg_style} background-size: cover; background-position: center; background-attachment: fixed; }}
+    </style>
+""", unsafe_allow_html=True)
 
 # --- GOOGLE SHEETS CONNECTION ---
 @st.cache_resource
@@ -49,14 +65,12 @@ products = load_inventory()
 if 'cart' not in st.session_state: st.session_state['cart'] = []
 
 # --- UI LAYOUT ---
-st.title("🖨️ 3D Printing Market Hub")
+st.title("🖨️ Spazz Shack")
 
 main_col1, main_col2 = st.columns([4, 3], gap="large")
 
 with main_col1:
     st.markdown("### 🛍️ Quick-Add Inventory")
-    
-    # Filter by Category
     all_prods = load_inventory()
     categories = sorted(list(set(p["category"] for p in all_prods.values())))
     selected_cat = st.selectbox("Filter by Category", categories)
