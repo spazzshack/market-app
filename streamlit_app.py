@@ -20,7 +20,7 @@ def get_base64_image(image_path):
 
 image_code = get_base64_image(IMAGE_PATH)
 
-# Refined CSS: Ensures content remains visible on top of background
+# Refined CSS
 st.markdown(f"""
     <style>
     .stApp {{
@@ -30,7 +30,6 @@ st.markdown(f"""
         background-position: center;
         background-attachment: fixed;
     }}
-    /* Ensures text remains readable */
     h1, h2, h3, p, div {{ color: white !important; }}
     </style>
 """, unsafe_allow_html=True)
@@ -83,7 +82,13 @@ with main_col1:
     st.markdown("### 🛍️ Quick-Add Inventory")
     all_prods = load_inventory()
     categories = sorted(list(set(p["category"] for p in all_prods.values())))
-    selected_cat = st.selectbox("Filter by Category", categories)
+    
+    # Keyboard-friendly selection
+    selected_cat = st.radio(
+        "Filter by Category", 
+        categories, 
+        horizontal=True
+    )
     
     filtered_prods = {k: v for k, v in all_prods.items() if v["category"] == selected_cat}
     
