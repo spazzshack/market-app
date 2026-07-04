@@ -47,15 +47,23 @@ def connect_to_google_sheets():
 
 wb = connect_to_google_sheets()
 
-# --- LOAD INVENTORY FROM SHEET ---
+# --- LOAD INVENTORY (WITH ERROR PROTECTION) ---
 @st.cache_data(ttl=60)
 def load_inventory():
     if not wb: return {}
     data = wb.worksheet("Inventory").get_all_records()
-    return {item["Product"]: {"weight": float(item["Weight"]), "time": float(item["Time"]), "labor": float(item["Labor"])} for item in data}
+    
+    def safe_float(val):
+        try: return float(val) if str(val).strip() != "" else 0.0
+        except: return 0.0
+
+    return {item["Product"]: {
+        "weight": safe_float(item["Weight"]), 
+        "time": safe_float(item["Time"]), 
+        "labor": safe_float(item["Labor"])
+    } for item in data}
 
 products = load_inventory()
-
 if 'cart' not in st.session_state: st.session_state['cart'] = []
 
 # --- UI LAYOUT ---
@@ -79,15 +87,20 @@ with main_col1:
         t = products[current_product]["time"]
         l = products[current_product]["labor"]
         
-        cost = (w * 0.10) + (t * 0.105 * 0.17)
-        suggested = round((cost / 0.20) + l)
+        # --- NEW PRICING MATH: $20/1000g = $0.02/g ---
+        material_cost = w * 0.02
+        power_cost = t * 0.02 
+        total_item_cost = material_cost + power_cost
         
-        st.metric("Suggested Price", f"${suggested}")
-        price = st.number_input("Sale Price ($)", value=int(suggested))
+        # 80% Margin formula: Cost / 0.20
+        target_price = round((total_item_cost / 0.20) + l)
+        
+        st.metric("Suggested Price", f"${target_price}", help="Calculated at 80% Profit Margin")
+        price = st.number_input("Sale Price ($)", value=int(target_price))
         qty = st.number_input("Quantity", min_value=1, value=1)
         
         if st.button("🛒 Add to Cart", type="primary"):
-            st.session_state['cart'].append({"Product": current_product, "Qty": qty, "Price": price, "Cost": cost})
+            st.session_state['cart'].append({"Product": current_product, "Qty": qty, "Price": price, "Cost": total_item_cost})
             st.rerun()
 
 with main_col2:
@@ -101,6 +114,7 @@ with main_col2:
             for item in st.session_state['cart']:
                 total_cost = round(item["Qty"] * item["Cost"], 2)
                 total_rev = item["Qty"] * item["Price"]
+                # Save: Date, Product, Qty, Payment, Cost, Paid, Profit
                 sales_sheet.append_row([str(datetime.date.today()), item["Product"], item["Qty"], pay_type, total_cost, total_rev, total_rev - total_cost])
             st.session_state['cart'] = []
             st.balloons()
