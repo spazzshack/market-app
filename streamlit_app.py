@@ -21,7 +21,7 @@ def get_base64_image(image_path):
 
 image_code = get_base64_image(IMAGE_PATH)
 
-# CSS for Background and "Pill" style buttons
+# CSS for Background and Perfectly Aligned "Pill" Buttons
 st.markdown(f"""
     <style>
     .stApp {{
@@ -33,13 +33,24 @@ st.markdown(f"""
     }}
     h1, h2, h3, p, div {{ color: white !important; }}
     
+    /* --- PERFECTLY ALIGNED PILL STYLING --- */
+    div[role="radiogroup"] {{
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 15px;
+        margin-bottom: 25px;
+    }}
     div[role="radiogroup"] > label {{
         background-color: rgba(255, 255, 255, 0.1);
-        padding: 10px 20px;
-        border-radius: 20px;
-        margin-right: 10px;
+        padding: 12px 0;
+        border-radius: 12px;
         border: 1px solid rgba(255, 255, 255, 0.3);
         cursor: pointer;
+        min-width: 140px; 
+        text-align: center;
+        flex: 1 1 140px;
     }}
     div[role="radiogroup"] > label:hover {{ background-color: rgba(255, 255, 255, 0.2); }}
     div[role="radiogroup"] input[type="radio"] {{ display: none; }}
@@ -64,7 +75,7 @@ def connect_to_google_sheets():
 
 wb = connect_to_google_sheets()
 
-# --- LOAD INVENTORY FUNCTION DEFINITION ---
+# --- LOAD INVENTORY FUNCTION ---
 @st.cache_data(ttl=60)
 def load_inventory():
     if not wb: return {}
@@ -87,7 +98,6 @@ if 'cart' not in st.session_state: st.session_state['cart'] = []
 # --- UI LAYOUT ---
 st.title("🖨️ Spazz Shack")
 
-# Now we call the function AFTER it is defined
 products = load_inventory()
 all_prods = products
 
@@ -95,7 +105,6 @@ main_col1, main_col2 = st.columns([4, 3], gap="large")
 
 with main_col1:
     st.markdown("### 🛍️ Quick-Add Inventory")
-    
     categories = sorted(list(set(p["category"] for p in all_prods.values())))
     selected_cat = st.radio("Filter by Category", categories, horizontal=True, label_visibility="collapsed")
     
@@ -135,13 +144,4 @@ with main_col2:
         pay_type = st.selectbox("Payment", ["Cash", "Venmo", "Square", "PayPal"])
         fee = 0.0
         if pay_type != "Cash":
-            add_fee = st.checkbox(f"Add 3% Processing Fee?", value=False)
-            if add_fee: fee = running_total * 0.03
-        st.metric("Total Due", f"${(running_total + fee):.2f}")
-        if st.button("💾 Checkout"):
-            sales_sheet = wb.worksheet("Sales")
-            for item in st.session_state['cart']:
-                data = products[item["Product"]]
-                sales_sheet.append_row([str(datetime.date.today()), item["Product"], item["Qty"], pay_type, 0, item["Total"], 0, 0])
-            st.session_state['cart'] = []
-            st.rerun()
+            add_fee = st.checkbox(
