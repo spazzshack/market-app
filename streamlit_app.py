@@ -9,13 +9,6 @@ import os
 # Page configuration
 st.set_page_config(page_title="3D Printing Market Hub", page_icon="🖨️", layout="wide")
 
-# Helper for images
-def get_base64_image(image_path):
-    if os.path.exists(image_path):
-        with open(image_path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode()
-    return None
-
 # --- GOOGLE SHEETS CONNECTION ---
 @st.cache_resource
 def connect_to_google_sheets():
@@ -48,7 +41,8 @@ def load_inventory():
         "time": safe_float(item["Time"]), 
         "labor": safe_float(item["Labor"]),
         "comp": safe_float(item.get("Component Cost", 0)),
-        "target": safe_float(item.get("Target Price", 0))
+        "target": safe_float(item.get("Target Price", 0)),
+        "category": item.get("Category", "General")
     } for item in data}
 
 products = load_inventory()
@@ -61,8 +55,16 @@ main_col1, main_col2 = st.columns([4, 3], gap="large")
 
 with main_col1:
     st.markdown("### 🛍️ Quick-Add Inventory")
+    
+    # Filter by Category
+    all_prods = load_inventory()
+    categories = sorted(list(set(p["category"] for p in all_prods.values())))
+    selected_cat = st.selectbox("Filter by Category", categories)
+    
+    filtered_prods = {k: v for k, v in all_prods.items() if v["category"] == selected_cat}
+    
     cols = st.columns(3)
-    for i, prod_name in enumerate(products.keys()):
+    for i, prod_name in enumerate(filtered_prods.keys()):
         if cols[i % 3].button(prod_name, use_container_width=True):
             st.session_state['selected_product'] = prod_name
 
