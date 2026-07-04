@@ -21,7 +21,7 @@ def get_base64_image(image_path):
 
 image_code = get_base64_image(IMAGE_PATH)
 
-# CSS for Background and Perfectly Aligned "Pill" Buttons
+# CSS for Background and 3-Wide Aligned "Pill" Buttons
 st.markdown(f"""
     <style>
     .stApp {{
@@ -33,7 +33,7 @@ st.markdown(f"""
     }}
     h1, h2, h3, p, div {{ color: white !important; }}
     
-    /* --- PERFECTLY ALIGNED PILL STYLING --- */
+    /* --- 3-WIDE PILL STYLING --- */
     div[role="radiogroup"] {{
         display: flex;
         flex-direction: row;
@@ -48,9 +48,9 @@ st.markdown(f"""
         border-radius: 12px;
         border: 1px solid rgba(255, 255, 255, 0.3);
         cursor: pointer;
-        min-width: 140px; 
+        /* Forces 3 wide: 30% width minus the gap */
+        flex: 0 0 30%; 
         text-align: center;
-        flex: 1 1 140px;
     }}
     div[role="radiogroup"] > label:hover {{ background-color: rgba(255, 255, 255, 0.2); }}
     div[role="radiogroup"] input[type="radio"] {{ display: none; }}
@@ -145,7 +145,8 @@ with main_col2:
         fee = 0.0
         if pay_type != "Cash":
             add_fee = st.checkbox(f"Add 3% Processing Fee?", value=False)
-            if add_fee: fee = running_total * 0.03
+            if add_fee: 
+                fee = running_total * 0.03
         st.metric("Total Due", f"${(running_total + fee):.2f}")
         if st.button("💾 Checkout"):
             sales_sheet = wb.worksheet("Sales")
