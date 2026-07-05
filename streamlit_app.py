@@ -34,26 +34,22 @@ st.markdown(f"""
     }}
     h1, h2, h3, p, div {{ color: white !important; }}
 
-    /* 2. Force Pillar Shape for Segmented Control */
-    /* Target the button base */
+    /* 2. Absolute Pill Override for Segmented Control */
     [data-testid="stBaseButton-segmented_control"] {{
         border-radius: 50px !important;
         background-color: rgba(255, 255, 255, 0.1) !important;
         border: 1px solid rgba(255, 255, 255, 0.3) !important;
-        transition: all 0.2s ease !important;
+        transition: none !important; /* Disabling transition to prevent flicker */
     }}
 
-    /* Target the container wrapping the buttons to enforce consistent shape */
-    [data-testid="stSegmentedControl"] > div {{
-        border-radius: 50px !important;
-    }}
-
-    /* 3. The "Kill Switch" for the boxy clicked state */
+    /* 3. The "State Override" - Targets all interactions at once */
+    [data-testid="stBaseButton-segmented_control"]:hover,
+    [data-testid="stBaseButton-segmented_control"]:active,
     [data-testid="stBaseButton-segmented_control"][aria-pressed="true"] {{
+        border-radius: 50px !important;
         background-color: rgba(255, 255, 255, 0.4) !important;
         border: 1px solid white !important;
-        border-radius: 50px !important; /* Force this again */
-        box-shadow: none !important;    /* Remove any default box shadows */
+        box-shadow: none !important;
     }}
     </style>
 """, unsafe_allow_html=True)
