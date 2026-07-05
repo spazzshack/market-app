@@ -21,7 +21,7 @@ def get_base64_image(image_path):
 
 image_code = get_base64_image(IMAGE_PATH)
 
-# CSS for styling
+# --- REVISED CSS FOR 3-WIDE GRID ---
 st.markdown(f"""
     <style>
     .stApp {{
@@ -32,6 +32,21 @@ st.markdown(f"""
         background-attachment: fixed;
     }}
     h1, h2, h3, p, div {{ color: white !important; }}
+    
+    /* Grid container for 3-wide buttons */
+    .category-grid {{
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-bottom: 20px;
+    }}
+    /* Force buttons to fill the grid cell and stay uniform */
+    div[data-testid="stButton"] button {{
+        width: 100% !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -40,18 +55,15 @@ st.markdown(f"""
 def connect_to_google_sheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        # Look for secret or local file
         if "gcp_service_account" in st.secrets:
             import json
             creds_dict = dict(st.secrets["gcp_service_account"])
             creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         else:
-            # Fallback path - verify this path on your machine
             creds = ServiceAccountCredentials.from_json_keyfile_name("google_creds.json", scope)
         client = gspread.authorize(creds)
         return client.open("3D Printing Market Sales")
     except Exception as e:
-        st.error(f"Connection Error: {e}")
         return None
 
 wb = connect_to_google_sheets()
@@ -70,8 +82,7 @@ def load_inventory():
             "target": float(item.get("Target Price", 0) or 0),
             "category": item.get("Category", "General")
         } for item in data}
-    except Exception as e:
-        return {}
+    except: return {}
 
 if 'cart' not in st.session_state: st.session_state['cart'] = []
 if 'selected_cat' not in st.session_state: st.session_state['selected_cat'] = None
@@ -81,7 +92,7 @@ st.title("🖨️ Spazz Shack")
 products = load_inventory()
 
 if not products:
-    st.warning("No inventory loaded. Please check your Google Sheet connection.")
+    st.warning("Inventory not loaded.")
     st.stop()
 
 main_col1, main_col2 = st.columns([0.6, 0.4])
@@ -89,25 +100,21 @@ main_col1, main_col2 = st.columns([0.6, 0.4])
 with main_col1:
     st.markdown("### 🛍️ Quick-Add Inventory")
     
-    # Extract categories safely
+    # Get unique categories
     categories = sorted(list(set(p["category"] for p in products.values())))
-    
-    # Manual 3-column grid for buttons
     if not st.session_state['selected_cat']:
         st.session_state['selected_cat'] = categories[0]
         
-    for i in range(0, len(categories), 3):
-        row = st.columns(3)
-        for j in range(3):
-            if i + j < len(categories):
-                cat = categories[i+j]
-                # Highlight active button
-                btn_type = "primary" if st.session_state['selected_cat'] == cat else "secondary"
-                if row[j].button(cat, use_container_width=True, type=btn_type):
-                    st.session_state['selected_cat'] = cat
-                    st.rerun()
+    # Inject Category Grid
+    st.markdown('<div class="category-grid">', unsafe_allow_html=True)
+    for cat in categories:
+        btn_type = "primary" if st.session_state['selected_cat'] == cat else "secondary"
+        if st.button(cat, key=f"cat_{cat}", type=btn_type):
+            st.session_state['selected_cat'] = cat
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
     
-    # Filter and display products
+    # Display products for selected category
     sel_cat = st.session_state['selected_cat']
     filtered_prods = {k: v for k, v in products.items() if v["category"] == sel_cat}
     
@@ -116,11 +123,10 @@ with main_col1:
         if cols[i % 3].button(prod_name, use_container_width=True):
             st.session_state['selected_product'] = prod_name
 
-    # Product details
+    # Product details...
     current_product = st.session_state.get('selected_product', None)
     if current_product and current_product in products:
         data = products[current_product]
-        # Calculations...
         printing_cost = (data["weight"] * 0.02) + (data["time"] * 0.02)
         total_make_cost = printing_cost + data["comp"]
         suggested_price = (printing_cost / 0.20) + data["comp"] + data["labor"]
