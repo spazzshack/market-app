@@ -35,13 +35,22 @@ st.markdown(f"""
     h1, h2, h3, p, div {{ color: white !important; }}
     
     /* --- PILL SHAPING FOR SEGMENTED CONTROL --- */
-    div[data-baseweb="segmented-control"] > div {{
-        border-radius: 25px !important;
-        background-color: rgba(255, 255, 255, 0.1);
+    /* Target the container */
+    div[data-baseweb="segmented-control"] {{
+        background-color: transparent !important;
     }}
     
+    /* Force round corners on the buttons */
     div[data-baseweb="segmented-control"] button {{
-        border-radius: 25px !important;
+        border-radius: 50px !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        margin: 0 5px !important;
+    }}
+    
+    /* Target the active button to match your previous theme */
+    div[data-baseweb="segmented-control"] button[aria-checked="true"] {{
+        background-color: rgba(255, 255, 255, 0.4) !important;
+        border: 1px solid white !important;
     }}
     </style>
 """, unsafe_allow_html=True)
