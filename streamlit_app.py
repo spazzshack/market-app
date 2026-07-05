@@ -9,45 +9,30 @@ import os
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Spazz Shack", page_icon="🖨️", layout="wide")
 
-# Pathing setup
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-IMAGE_PATH = os.path.join(SCRIPT_DIR, "static", "logo.png")
-
-def get_base64_image(image_path):
-    if os.path.exists(image_path):
-        with open(image_path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode()
-    return None
-
-image_code = get_base64_image(IMAGE_PATH)
-
-# --- REVISED CSS FOR UNIFORM 3-WIDE GRID ---
-st.markdown(f"""
+# CSS to force the grid and button uniformity
+st.markdown("""
     <style>
-    .stApp {{
-        background: linear-gradient(rgba(15, 23, 42, 0.90), rgba(15, 23, 42, 0.90)), 
-                    url("data:image/png;base64,{image_code}");
-        background-size: cover;
-        background-position: center;
-        background-attachment: fixed;
-    }}
-    h1, h2, h3, p, div {{ color: white !important; }}
-    
-    /* Grid container for 3-wide buttons */
-    .category-grid {{
-        display: grid;
-        grid-template-columns: repeat(3, 1fr); /* Forces 3 equal columns */
-        gap: 10px;
-        margin-bottom: 20px;
-    }}
-    /* Forces all buttons to take up the full width of their grid cell */
-    div[data-testid="stButton"] > button {{
+    /* 1. Define the grid container */
+    .category-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 10px !important;
         width: 100% !important;
-        height: 50px !important; /* Fixed height for uniformity */
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }}
+    }
+    
+    /* 2. Force buttons inside the grid to match cell size */
+    .category-grid div[data-testid="stButton"] {
+        width: 100% !important;
+    }
+    
+    .category-grid div[data-testid="stButton"] button {
+        width: 100% !important;
+        height: 50px !important;
+        font-size: 14px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -56,16 +41,9 @@ st.markdown(f"""
 def connect_to_google_sheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        if "gcp_service_account" in st.secrets:
-            import json
-            creds_dict = dict(st.secrets["gcp_service_account"])
-            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        else:
-            creds = ServiceAccountCredentials.from_json_keyfile_name("google_creds.json", scope)
-        client = gspread.authorize(creds)
-        return client.open("3D Printing Market Sales")
-    except Exception as e:
-        return None
+        creds = ServiceAccountCredentials.from_json_keyfile_name("google_creds.json", scope)
+        return gspread.authorize(creds).open("3D Printing Market Sales")
+    except: return None
 
 wb = connect_to_google_sheets()
 
@@ -73,90 +51,45 @@ wb = connect_to_google_sheets()
 @st.cache_data(ttl=60)
 def load_inventory():
     if not wb: return {}
-    try:
-        data = wb.worksheet("Inventory").get_all_records()
-        return {item["Product"]: {
-            "weight": float(item.get("Weight", 0) or 0), 
-            "time": float(item.get("Time", 0) or 0), 
-            "labor": float(item.get("Labor", 0) or 0),
-            "comp": float(item.get("Component Cost", 0) or 0),
-            "target": float(item.get("Target Price", 0) or 0),
-            "category": item.get("Category", "General")
-        } for item in data}
-    except: return {}
+    data = wb.worksheet("Inventory").get_all_records()
+    return {item["Product"]: {
+        "category": item.get("Category", "General"),
+        "weight": float(item.get("Weight", 0) or 0),
+        "time": float(item.get("Time", 0) or 0),
+        "labor": float(item.get("Labor", 0) or 0),
+        "comp": float(item.get("Component Cost", 0) or 0),
+        "target": float(item.get("Target Price", 0) or 0)
+    } for item in data}
 
+products = load_inventory()
 if 'cart' not in st.session_state: st.session_state['cart'] = []
 if 'selected_cat' not in st.session_state: st.session_state['selected_cat'] = None
 
 # --- UI LAYOUT ---
 st.title("🖨️ Spazz Shack")
-products = load_inventory()
-
-if not products:
-    st.warning("Inventory not loaded.")
-    st.stop()
-
 main_col1, main_col2 = st.columns([0.6, 0.4])
 
 with main_col1:
     st.markdown("### 🛍️ Quick-Add Inventory")
     
-    # Get unique categories
     categories = sorted(list(set(p["category"] for p in products.values())))
-    if not st.session_state['selected_cat']:
-        st.session_state['selected_cat'] = categories[0]
+    if not st.session_state['selected_cat']: st.session_state['selected_cat'] = categories[0]
         
-    # Inject Category Grid
+    # Inject the grid container
     st.markdown('<div class="category-grid">', unsafe_allow_html=True)
     for cat in categories:
-        btn_type = "primary" if st.session_state['selected_cat'] == cat else "secondary"
-        if st.button(cat, key=f"cat_{cat}", type=btn_type):
+        if st.button(cat, key=f"btn_{cat}", type="primary" if st.session_state['selected_cat'] == cat else "secondary"):
             st.session_state['selected_cat'] = cat
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Product list display
+    # Products
     sel_cat = st.session_state['selected_cat']
     filtered_prods = {k: v for k, v in products.items() if v["category"] == sel_cat}
     
-    # Optional: Display products as a list below
-    st.markdown("---")
-    for prod_name in filtered_prods.keys():
-        if st.button(prod_name, use_container_width=True):
-            st.session_state['selected_product'] = prod_name
-
-    # Product details...
-    current_product = st.session_state.get('selected_product', None)
-    if current_product and current_product in products:
-        data = products[current_product]
-        printing_cost = (data["weight"] * 0.02) + (data["time"] * 0.02)
-        total_make_cost = printing_cost + data["comp"]
-        suggested_price = (printing_cost / 0.20) + data["comp"] + data["labor"]
-        
-        st.markdown(f"**Active:** {current_product}")
-        c1, c2 = st.columns(2)
-        c1.metric("Cost to Make", f"${total_make_cost:.2f}")
-        c2.metric("Suggested Price", f"${suggested_price:.2f}")
-        
-        price = st.number_input("Sale Price ($)", value=data["target"] if data["target"] > 0 else int(suggested_price))
-        qty = st.number_input("Quantity", min_value=1, value=1)
-        
-        if st.button("🛒 Add to Cart", type="primary"):
-            st.session_state['cart'].append({"Product": current_product, "Qty": qty, "Sale Price": price, "Total": qty * price})
-            st.rerun()
-
-with main_col2:
-    st.markdown("### 🛒 Checkout")
-    if st.session_state['cart']:
-        df = pd.DataFrame(st.session_state['cart'])
-        st.table(df)
-        running_total = df["Total"].sum()
-        pay_type = st.selectbox("Payment", ["Cash", "Venmo", "Square", "PayPal"])
-        fee = (running_total * 0.03) if pay_type != "Cash" and st.checkbox("Add 3% Fee?") else 0.0
-        st.metric("Total Due", f"${(running_total + fee):.2f}")
-        if st.button("💾 Checkout"):
-            sales_sheet = wb.worksheet("Sales")
-            for item in st.session_state['cart']:
-                sales_sheet.append_row([str(datetime.date.today()), item["Product"], item["Qty"], pay_type, 0, item["Total"], 0, 0])
-            st.session_state['cart'] = []
-            st.rerun()
+    # Product display list
+    for prod in filtered_prods.keys():
+        if st.button(prod, key=f"prod_{prod}"):
+            st.session_state['selected_product'] = prod
+            
+    # ... (Keep existing product details logic below here)
