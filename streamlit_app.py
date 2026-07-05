@@ -33,7 +33,12 @@ st.markdown(f"""
     }}
     h1, h2, h3, p, div {{ color: white !important; }}
     
-    /* --- PERFECTLY ALIGNED PILL STYLING --- */
+    /* --- FORCE HIDE THE DOT --- */
+    div[role="radiogroup"] input[type="radio"] {{
+        display: none !important;
+    }}
+
+    /* --- PILL STYLING --- */
     div[role="radiogroup"] {{
         display: flex;
         flex-direction: row;
@@ -44,32 +49,37 @@ st.markdown(f"""
     }}
     div[role="radiogroup"] > label {{
         background-color: rgba(255, 255, 255, 0.1);
-        padding: 12px 0;
-        border-radius: 12px;
+        padding: 12px 20px;
+        border-radius: 25px;
         border: 1px solid rgba(255, 255, 255, 0.3);
         cursor: pointer;
-        min-width: 140px; 
-        text-align: center;
-        flex: 1 1 140px;
+        transition: all 0.2s ease;
     }}
-    div[role="radiogroup"] > label:hover {{ background-color: rgba(255, 255, 255, 0.2); }}
-    div[role="radiogroup"] input[type="radio"] {{ display: none; }}
+    
+    /* --- LIGHT UP THE PILL WHEN SELECTED --- */
+    /* This specifically targets the label following the checked radio */
+    div[role="radiogroup"] input[type="radio"]:checked + label {{
+        background-color: rgba(255, 255, 255, 0.4) !important;
+        border: 1px solid white !important;
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+    }}
     </style>
 """, unsafe_allow_html=True)
 
-# --- GOOGLE SHEETS CONNECTION (CLOUD ONLY) ---
+# --- GOOGLE SHEETS CONNECTION ---
 @st.cache_resource
 def connect_to_google_sheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        # Exclusively uses st.secrets. If this is missing, the app will stop and alert you.
-        import json
-        creds_dict = dict(st.secrets["gcp_service_account"])
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        if "gcp_service_account" in st.secrets:
+            import json
+            creds_dict = dict(st.secrets["gcp_service_account"])
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        else:
+            creds = ServiceAccountCredentials.from_json_keyfile_name("C:/Users/adamq/desktop/market-app/google_creds.json", scope)
         client = gspread.authorize(creds)
         return client.open("3D Printing Market Sales")
     except Exception as e:
-        st.error(f"Configuration Error: {e}. Ensure 'gcp_service_account' is set in Streamlit Secrets.")
         return None
 
 wb = connect_to_google_sheets()
