@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
@@ -9,38 +8,30 @@ st.set_page_config(page_title="Spazz Shack", page_icon="🖨️", layout="wide")
 # --- CSS FOR EDGE-TO-EDGE BUTTONS ---
 st.markdown("""
     <style>
-    /* Force every button to be full width */
-    div[data-testid="stButton"] {
-        width: 100% !important;
-        margin-bottom: 5px !important;
-    }
-    div[data-testid="stButton"] button {
-        width: 100% !important;
-        height: 50px !important;
-    }
+    div[data-testid="stButton"] { width: 100% !important; margin-bottom: 5px !important; }
+    div[data-testid="stButton"] button { width: 100% !important; height: 50px !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- DATA LOADING ---
-def load_inventory():
-    # Replace the dict below with your actual Google Sheets connection code
-    # This ensures your categories are pulled dynamically
-    return {
-        "Toy Car": {"category": "Toys"},
-        "Keychain": {"category": "Accessories"},
-        "Vase": {"category": "Decor"},
-        "Action Figure": {"category": "Toys"},
-        "Earrings": {"category": "Accessories"},
-        "Planter": {"category": "Decor"},
-        "Dinosaur": {"category": "Toys"},
-        "Ring": {"category": "Accessories"},
-        "Bowl": {"category": "Decor"}
-    }
+# --- GOOGLE SHEETS CONNECTION ---
+def get_inventory():
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_name("google_creds.json", scope)
+        client = gspread.authorize(creds)
+        # Change "3D Printing Market Sales" if your sheet name is different
+        sheet = client.open("3D Printing Market Sales").sheet1 
+        data = sheet.get_all_records()
+        # This maps the Sheet data. Ensure your headers are 'Product' and 'Category'
+        return {row['Product']: {'category': row['Category']} for row in data}
+    except Exception as e:
+        # If this runs, check your terminal for the exact error (e.g., file not found)
+        st.error(f"Could not load data from Google Sheets: {e}")
+        return {}
 
-products = load_inventory()
-
-# Extract unique categories from the product data
-# This ensures that if you add a new category to your sheet, it shows up automatically
+# Load live data
+products = get_inventory()
+# This creates the category list directly from your live sheet data
 categories = sorted(list(set(p["category"] for p in products.values())))
 
 # --- SESSION STATE ---
@@ -50,29 +41,31 @@ if 'selected_cat' not in st.session_state and categories:
 # --- APP UI ---
 st.title("🖨️ Spazz Shack")
 
-main_col1, main_col2 = st.columns([0.6, 0.4])
+col1, col2 = st.columns([0.6, 0.4])
 
-with main_col1:
+with col1:
     st.subheader("🛍️ Categories")
     
-    # RENDER ALL CATEGORIES
-    # This loop reads the 'categories' list created from your data
+    if not categories:
+        st.info("Waiting for data from Google Sheets...")
+    
+    # RENDER CATEGORIES EDGE-TO-EDGE
     for cat in categories:
         btn_type = "primary" if st.session_state.get('selected_cat') == cat else "secondary"
         if st.button(cat, key=f"btn_{cat}", type=btn_type):
             st.session_state['selected_cat'] = cat
             st.rerun()
-    
-    st.markdown("<br>", unsafe_allow_html=True)
+            
+    st.markdown("---")
     st.subheader("📦 Products")
     
-    # RENDER FILTERED PRODUCTS
+    # RENDER PRODUCTS
     sel_cat = st.session_state.get('selected_cat')
     if sel_cat:
         filtered_prods = [name for name, info in products.items() if info["category"] == sel_cat]
         for prod_name in filtered_prods:
             st.button(prod_name, key=f"prod_{prod_name}", use_container_width=True)
 
-with main_col2:
+with col2:
     st.subheader("🛒 Checkout")
     st.write("Cart is empty.")
