@@ -57,20 +57,19 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- GOOGLE SHEETS CONNECTION ---
+# --- GOOGLE SHEETS CONNECTION (CLOUD ONLY) ---
 @st.cache_resource
 def connect_to_google_sheets():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        if "gcp_service_account" in st.secrets:
-            import json
-            creds_dict = dict(st.secrets["gcp_service_account"])
-            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        else:
-            creds = ServiceAccountCredentials.from_json_keyfile_name("C:/Users/adamq/desktop/market-app/google_creds.json", scope)
+        # Exclusively uses st.secrets. If this is missing, the app will stop and alert you.
+        import json
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         return client.open("3D Printing Market Sales")
     except Exception as e:
+        st.error(f"Configuration Error: {e}. Ensure 'gcp_service_account' is set in Streamlit Secrets.")
         return None
 
 wb = connect_to_google_sheets()
