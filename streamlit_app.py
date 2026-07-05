@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import datetime
+import base64
+import os
 
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Spazz Shack", page_icon="🖨️", layout="wide")
@@ -9,6 +12,7 @@ st.set_page_config(page_title="Spazz Shack", page_icon="🖨️", layout="wide")
 # --- CSS GRID: FORCES EVERYTHING TO BE CENTERED AND 3-WIDE ---
 st.markdown("""
     <style>
+    /* The grid container forces exactly 3 columns */
     .main-grid {
         display: grid !important;
         grid-template-columns: repeat(3, 1fr) !important;
@@ -16,6 +20,7 @@ st.markdown("""
         width: 100% !important;
         margin: 0 auto !important;
     }
+    /* Buttons forced to fill their grid cells */
     div[data-testid="stButton"] {
         width: 100% !important;
     }
@@ -26,7 +31,17 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- DUMMY DATA ---
+# --- GOOGLE SHEETS CONNECTION ---
+# Note: Ensure 'google_creds.json' is in your GitHub folder
+def connect_to_google_sheets():
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_name("google_creds.json", scope)
+        return gspread.authorize(creds).open("3D Printing Market Sales")
+    except: return None
+
+# --- DUMMY DATA FOR LAYOUT TESTING ---
+# Remove this block and uncomment the Google Sheets code when ready
 def load_inventory():
     return {
         "Toy Car": {"category": "Toys"},
@@ -43,17 +58,18 @@ def load_inventory():
 products = load_inventory()
 categories = sorted(list(set(p["category"] for p in products.values())))
 
+# --- SESSION STATE ---
 if 'selected_cat' not in st.session_state:
     st.session_state['selected_cat'] = categories[0]
 
+# --- APP UI ---
 st.title("🖨️ Spazz Shack")
 
-# --- UI LAYOUT ---
 main_col1, main_col2 = st.columns([0.6, 0.4])
 
 with main_col1:
     st.subheader("🛍️ Categories")
-    # Use the CSS grid for categories
+    # CSS Grid Container for Categories
     st.markdown('<div class="main-grid">', unsafe_allow_html=True)
     for cat in categories:
         btn_type = "primary" if st.session_state['selected_cat'] == cat else "secondary"
@@ -63,7 +79,7 @@ with main_col1:
     st.markdown('</div>', unsafe_allow_html=True)
     
     st.subheader("📦 Products")
-    # Use the same CSS grid for products to ensure alignment
+    # CSS Grid Container for Products
     st.markdown('<div class="main-grid">', unsafe_allow_html=True)
     sel_cat = st.session_state['selected_cat']
     filtered_prods = [name for name, info in products.items() if info["category"] == sel_cat]
