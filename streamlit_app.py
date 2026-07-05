@@ -24,7 +24,7 @@ image_code = get_base64_image(IMAGE_PATH)
 # --- CSS FOR BACKGROUND AND PILLS ---
 st.markdown(f"""
     <style>
-    /* --- 1. BACKGROUND AND COLORS --- */
+    /* 1. Background (keeping your logo) */
     .stApp {{
         background: linear-gradient(rgba(15, 23, 42, 0.90), rgba(15, 23, 42, 0.90)), 
                     url("data:image/png;base64,{image_code}");
@@ -33,21 +33,27 @@ st.markdown(f"""
         background-attachment: fixed;
     }}
     h1, h2, h3, p, div {{ color: white !important; }}
-    
-    /* --- 2. PILL SHAPE FOR SEGMENTED CONTROL --- */
-    /* Target the button container and buttons */
-    button[data-testid="stBaseButton-segmented_control"] {{
+
+    /* 2. Force Pillar Shape for Segmented Control */
+    /* Target the button base */
+    [data-testid="stBaseButton-segmented_control"] {{
         border-radius: 50px !important;
         background-color: rgba(255, 255, 255, 0.1) !important;
         border: 1px solid rgba(255, 255, 255, 0.3) !important;
         transition: all 0.2s ease !important;
     }}
-    
-    /* Force rounded corners on the pressed/active state */
-    button[data-testid="stBaseButton-segmented_control"][aria-pressed="true"] {{
+
+    /* Target the container wrapping the buttons to enforce consistent shape */
+    [data-testid="stSegmentedControl"] > div {{
+        border-radius: 50px !important;
+    }}
+
+    /* 3. The "Kill Switch" for the boxy clicked state */
+    [data-testid="stBaseButton-segmented_control"][aria-pressed="true"] {{
         background-color: rgba(255, 255, 255, 0.4) !important;
         border: 1px solid white !important;
-        border-radius: 50px !important;
+        border-radius: 50px !important; /* Force this again */
+        box-shadow: none !important;    /* Remove any default box shadows */
     }}
     </style>
 """, unsafe_allow_html=True)
