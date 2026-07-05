@@ -24,30 +24,17 @@ image_code = get_base64_image(IMAGE_PATH)
 # --- CSS FOR BACKGROUND AND PILLS ---
 st.markdown(f"""
     <style>
-    /* --- GENERAL APP STYLING --- */
-    .stApp {{
-        background: linear-gradient(rgba(15, 23, 42, 0.90), rgba(15, 23, 42, 0.90)), 
-                    url("data:image/png;base64,{image_code}");
-        background-size: cover;
-        background-position: center;
-        background-attachment: fixed;
-    }}
-    h1, h2, h3, p, div {{ color: white !important; }}
+    /* --- FORCE PILL SHAPE ON SEGMENTED CONTROL --- */
     
-    /* --- PILL SHAPING FOR SEGMENTED CONTROL --- */
-    /* Target the container */
-    div[data-baseweb="segmented-control"] {{
-        background-color: transparent !important;
-    }}
-    
-    /* Force round corners on the buttons */
+    /* Target the buttons inside the segmented control component */
     div[data-baseweb="segmented-control"] button {{
         border-radius: 50px !important;
         border: 1px solid rgba(255, 255, 255, 0.3) !important;
-        margin: 0 5px !important;
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        transition: all 0.2s ease !important;
     }}
-    
-    /* Target the active button to match your previous theme */
+
+    /* Target the selected button to ensure it highlights correctly */
     div[data-baseweb="segmented-control"] button[aria-checked="true"] {{
         background-color: rgba(255, 255, 255, 0.4) !important;
         border: 1px solid white !important;
