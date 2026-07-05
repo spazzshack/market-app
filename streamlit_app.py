@@ -21,7 +21,7 @@ def get_base64_image(image_path):
 
 image_code = get_base64_image(IMAGE_PATH)
 
-# --- REVISED CSS FOR 3-WIDE GRID ---
+# --- REVISED CSS FOR UNIFORM 3-WIDE GRID ---
 st.markdown(f"""
     <style>
     .stApp {{
@@ -36,13 +36,14 @@ st.markdown(f"""
     /* Grid container for 3-wide buttons */
     .category-grid {{
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
+        grid-template-columns: repeat(3, 1fr); /* Forces 3 equal columns */
+        gap: 10px;
         margin-bottom: 20px;
     }}
-    /* Force buttons to fill the grid cell and stay uniform */
-    div[data-testid="stButton"] button {{
+    /* Forces all buttons to take up the full width of their grid cell */
+    div[data-testid="stButton"] > button {{
         width: 100% !important;
+        height: 50px !important; /* Fixed height for uniformity */
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -114,13 +115,14 @@ with main_col1:
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Display products for selected category
+    # Product list display
     sel_cat = st.session_state['selected_cat']
     filtered_prods = {k: v for k, v in products.items() if v["category"] == sel_cat}
     
-    cols = st.columns(3)
-    for i, prod_name in enumerate(filtered_prods.keys()):
-        if cols[i % 3].button(prod_name, use_container_width=True):
+    # Optional: Display products as a list below
+    st.markdown("---")
+    for prod_name in filtered_prods.keys():
+        if st.button(prod_name, use_container_width=True):
             st.session_state['selected_product'] = prod_name
 
     # Product details...
