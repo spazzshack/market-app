@@ -6,30 +6,13 @@ from oauth2client.service_account import ServiceAccountCredentials
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Spazz Shack", page_icon="🖨️", layout="wide")
 
-# --- CSS FOR CENTERED GRID ---
+# --- CSS FOR GRID ALIGNMENT ---
 st.markdown("""
     <style>
-    .centered-grid {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        justify-content: center !important;
-        gap: 15px !important;
+    /* Force consistent button heights */
+    div[data-testid="stButton"] button {
+        height: 50px !important;
         width: 100% !important;
-    }
-    .grid-item {
-        flex: 0 0 calc(45%) !important; /* 2-wide layout */
-    }
-    /* Style our custom buttons to look like Streamlit buttons */
-    .custom-btn {
-        display: block;
-        width: 100%;
-        padding: 10px;
-        text-align: center;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        text-decoration: none;
-        color: black;
-        background-color: #f0f2f6;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -51,9 +34,11 @@ def load_inventory():
 products = load_inventory()
 categories = sorted(list(set(p["category"] for p in products.values())))
 
+# --- SESSION STATE ---
 if 'selected_cat' not in st.session_state:
     st.session_state['selected_cat'] = categories[0]
 
+# --- APP UI ---
 st.title("🖨️ Spazz Shack")
 
 main_col1, main_col2 = st.columns([0.6, 0.4])
@@ -61,23 +46,25 @@ main_col1, main_col2 = st.columns([0.6, 0.4])
 with main_col1:
     st.subheader("🛍️ Categories")
     
-    # RENDER CENTERED CATEGORY BUTTONS
-    st.markdown('<div class="centered-grid">', unsafe_allow_html=True)
-    for cat in categories:
-        # We use a query parameter hack to detect button clicks on HTML elements
-        btn_class = "custom-btn"
-        if st.session_state['selected_cat'] == cat:
-            btn_class += " primary-style"
-        
-        # Link button to trigger a rerun with the selection
-        if st.button(cat, key=f"cat_{cat}", use_container_width=True):
-            st.session_state['selected_cat'] = cat
-            st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    # 2-WIDE GRID FOR CATEGORIES
+    # This loop forces 2 buttons per row, perfectly aligned.
+    for i in range(0, len(categories), 2):
+        row = categories[i:i+2]
+        cols = st.columns(2)
+        for idx, cat in enumerate(row):
+            with cols[idx]:
+                btn_type = "primary" if st.session_state['selected_cat'] == cat else "secondary"
+                if st.button(cat, key=f"btn_{cat}", type=btn_type):
+                    st.session_state['selected_cat'] = cat
+                    st.rerun()
     
+    st.markdown("<br>", unsafe_allow_html=True)
     st.subheader("📦 Products")
+    
+    # WIDE BUTTONS FOR PRODUCTS (One per line)
     sel_cat = st.session_state['selected_cat']
     filtered_prods = [name for name, info in products.items() if info["category"] == sel_cat]
+    
     for prod_name in filtered_prods:
         st.button(prod_name, key=f"prod_{prod_name}", use_container_width=True)
 
