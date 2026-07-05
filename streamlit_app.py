@@ -110,7 +110,7 @@ all_prods = products
 main_col1, main_col2 = st.columns([4, 3], gap="large")
 
 with main_col1:
-st.markdown("### 🛍️ Quick-Add Inventory")
+    st.markdown("### 🛍️ Quick-Add Inventory")
     categories = sorted(list(set(p["category"] for p in all_prods.values())))
     
     # --- HERE IS THE CHANGE: 1 line becomes 3, but it replaces the old ones ---
