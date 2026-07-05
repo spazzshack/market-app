@@ -34,22 +34,20 @@ st.markdown(f"""
     }}
     h1, h2, h3, p, div {{ color: white !important; }}
 
-    /* 2. Absolute Pill Override for Segmented Control */
-    [data-testid="stBaseButton-segmented_control"] {{
+    /* 2. The "Atomic" Override for Segmented Control */
+    /* This targets every single element inside the component group */
+    div[data-testid="stSegmentedControl"] button,
+    div[data-testid="stSegmentedControl"] button *,
+    div[data-testid="stSegmentedControl"] div,
+    button[data-testid="stBaseButton-segmented_control"] {{
         border-radius: 50px !important;
-        background-color: rgba(255, 255, 255, 0.1) !important;
         border: 1px solid rgba(255, 255, 255, 0.3) !important;
-        transition: none !important; /* Disabling transition to prevent flicker */
     }}
-
-    /* 3. The "State Override" - Targets all interactions at once */
-    [data-testid="stBaseButton-segmented_control"]:hover,
-    [data-testid="stBaseButton-segmented_control"]:active,
-    [data-testid="stBaseButton-segmented_control"][aria-pressed="true"] {{
-        border-radius: 50px !important;
+    
+    /* 3. Force state colors without resetting shape */
+    button[data-testid="stBaseButton-segmented_control"][aria-pressed="true"] {{
         background-color: rgba(255, 255, 255, 0.4) !important;
         border: 1px solid white !important;
-        box-shadow: none !important;
     }}
     </style>
 """, unsafe_allow_html=True)
