@@ -2,17 +2,20 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import datetime
-import base64
-import os
 
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Spazz Shack", page_icon="🖨️", layout="wide")
 
-# --- CSS FOR GRID ALIGNMENT ---
+# --- CSS GRID: FORCES EVERYTHING TO BE CENTERED AND 3-WIDE ---
 st.markdown("""
     <style>
-    /* Force consistent button sizing */
+    .main-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 10px !important;
+        width: 100% !important;
+        margin: 0 auto !important;
+    }
     div[data-testid="stButton"] {
         width: 100% !important;
     }
@@ -23,8 +26,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- DUMMY DATA FOR LAYOUT TESTING ---
-# Replace this with your Google Sheets connection once ready
+# --- DUMMY DATA ---
 def load_inventory():
     return {
         "Toy Car": {"category": "Toys"},
@@ -39,10 +41,8 @@ def load_inventory():
     }
 
 products = load_inventory()
-# Get all categories
 categories = sorted(list(set(p["category"] for p in products.values())))
 
-# Initialize State
 if 'selected_cat' not in st.session_state:
     st.session_state['selected_cat'] = categories[0]
 
@@ -52,28 +52,25 @@ st.title("🖨️ Spazz Shack")
 main_col1, main_col2 = st.columns([0.6, 0.4])
 
 with main_col1:
-    st.markdown("### 🛍️ Quick-Add Inventory")
+    st.subheader("🛍️ Categories")
+    # Use the CSS grid for categories
+    st.markdown('<div class="main-grid">', unsafe_allow_html=True)
+    for cat in categories:
+        btn_type = "primary" if st.session_state['selected_cat'] == cat else "secondary"
+        if st.button(cat, key=f"btn_{cat}", type=btn_type):
+            st.session_state['selected_cat'] = cat
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
     
-    # MANUAL 3-COLUMN LAYOUT
-    # We break the categories into chunks of 3 to force a perfect 3-wide grid
-    for i in range(0, len(categories), 3):
-        row = categories[i:i+3]
-        cols = st.columns(3)
-        for idx, cat in enumerate(row):
-            with cols[idx]:
-                btn_type = "primary" if st.session_state['selected_cat'] == cat else "secondary"
-                if st.button(cat, key=f"btn_{cat}", type=btn_type):
-                    st.session_state['selected_cat'] = cat
-                    st.rerun()
-    
-    # Products list
-    st.subheader("Products")
+    st.subheader("📦 Products")
+    # Use the same CSS grid for products to ensure alignment
+    st.markdown('<div class="main-grid">', unsafe_allow_html=True)
     sel_cat = st.session_state['selected_cat']
     filtered_prods = [name for name, info in products.items() if info["category"] == sel_cat]
-    
     for prod_name in filtered_prods:
-        st.button(prod_name, key=f"prod_{prod_name}", use_container_width=True)
+        st.button(prod_name, key=f"prod_{prod_name}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 with main_col2:
-    st.markdown("### 🛒 Checkout")
+    st.subheader("🛒 Checkout")
     st.write("Cart is empty.")
