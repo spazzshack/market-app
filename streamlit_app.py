@@ -9,78 +9,147 @@ import os
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Spazz Shack", page_icon="🖨️", layout="wide")
 
-# --- CSS FOR PERFECT 3-WIDE GRID ---
-st.markdown("""
+# Pathing setup
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+IMAGE_PATH = os.path.join(SCRIPT_DIR, "static", "logo.png")
+
+def get_base64_image(image_path):
+    if os.path.exists(image_path):
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    return None
+
+image_code = get_base64_image(IMAGE_PATH)
+
+# CSS for Background and Perfectly Aligned "Pill" Buttons
+st.markdown(f"""
     <style>
-    /* This container forces 3 equal columns regardless of screen size */
-    .category-grid {
-        display: grid !important;
-        grid-template-columns: repeat(3, 1fr) !important;
-        gap: 10px !important;
-        width: 100% !important;
-        margin-bottom: 20px;
-    }
-    /* Force buttons to fill their grid cells */
-    div[data-testid="stButton"] {
-        width: 100% !important;
-    }
-    div[data-testid="stButton"] button {
-        width: 100% !important;
-        height: 50px !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-    }
+    .stApp {{
+        background: linear-gradient(rgba(15, 23, 42, 0.90), rgba(15, 23, 42, 0.90)), 
+                    url("data:image/png;base64,{image_code}");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }}
+    h1, h2, h3, p, div {{ color: white !important; }}
+    
+    /* --- PERFECTLY ALIGNED PILL STYLING --- */
+    div[role="radiogroup"] {{
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 15px;
+        margin-bottom: 25px;
+    }}
+    div[role="radiogroup"] > label {{
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 12px 0;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        cursor: pointer;
+        min-width: 140px; 
+        text-align: center;
+        flex: 1 1 140px;
+    }}
+    div[role="radiogroup"] > label:hover {{ background-color: rgba(255, 255, 255, 0.2); }}
+    div[role="radiogroup"] input[type="radio"] {{ display: none; }}
     </style>
 """, unsafe_allow_html=True)
 
-# --- DUMMY DATA FOR LAYOUT TESTING ---
+# --- GOOGLE SHEETS CONNECTION ---
+@st.cache_resource
+def connect_to_google_sheets():
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        if "gcp_service_account" in st.secrets:
+            import json
+            creds_dict = dict(st.secrets["gcp_service_account"])
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        else:
+            creds = ServiceAccountCredentials.from_json_keyfile_name("C:/Users/adamq/desktop/market-app/google_creds.json", scope)
+        client = gspread.authorize(creds)
+        return client.open("3D Printing Market Sales")
+    except Exception as e:
+        return None
+
+wb = connect_to_google_sheets()
+
+# --- LOAD INVENTORY FUNCTION ---
+@st.cache_data(ttl=60)
 def load_inventory():
-    return {
-        "Toy Car": {"category": "Toys", "weight": 10, "target": 5},
-        "Keychain": {"category": "Accessories", "weight": 2, "target": 2},
-        "Vase": {"category": "Decor", "weight": 50, "target": 15},
-        "Action Figure": {"category": "Toys", "weight": 20, "target": 10},
-        "Earrings": {"category": "Accessories", "weight": 1, "target": 8},
-        "Planter": {"category": "Decor", "weight": 100, "target": 20},
-        "Dinosaur": {"category": "Toys", "weight": 30, "target": 12}
-    }
+    if not wb: return {}
+    data = wb.worksheet("Inventory").get_all_records()
+    def safe_float(val):
+        try: return float(val) if str(val).strip() != "" else 0.0
+        except: return 0.0
+    return {item["Product"]: {
+        "weight": safe_float(item["Weight"]), 
+        "time": safe_float(item["Time"]), 
+        "labor": safe_float(item["Labor"]),
+        "comp": safe_float(item.get("Component Cost", 0)),
+        "target": safe_float(item.get("Target Price", 0)),
+        "category": item.get("Category", "General")
+    } for item in data}
 
-products = load_inventory()
-
-# --- STATE ---
-if 'selected_cat' not in st.session_state: 
-    categories = sorted(list(set(p["category"] for p in products.values())))
-    st.session_state['selected_cat'] = categories[0]
-
-st.title("🖨️ Spazz Shack")
+# --- INITIALIZE STATE ---
+if 'cart' not in st.session_state: st.session_state['cart'] = []
 
 # --- UI LAYOUT ---
-# We keep the main columns here, but we put the grid directly inside main_col1
-main_col1, main_col2 = st.columns([0.6, 0.4])
+st.title("🖨️ Spazz Shack")
+
+products = load_inventory()
+all_prods = products
+
+main_col1, main_col2 = st.columns([4, 3], gap="large")
 
 with main_col1:
     st.markdown("### 🛍️ Quick-Add Inventory")
+    categories = sorted(list(set(p["category"] for p in all_prods.values())))
+    selected_cat = st.radio("Filter by Category", categories, horizontal=True, label_visibility="collapsed")
     
-    # Render the 3-wide Grid
-    categories = sorted(list(set(p["category"] for p in products.values())))
-    st.markdown('<div class="category-grid">', unsafe_allow_html=True)
-    for cat in categories:
-        btn_type = "primary" if st.session_state['selected_cat'] == cat else "secondary"
-        if st.button(cat, key=f"btn_{cat}", type=btn_type):
-            st.session_state['selected_cat'] = cat
+    filtered_prods = {k: v for k, v in all_prods.items() if v["category"] == selected_cat}
+    
+    cols = st.columns(3)
+    for i, prod_name in enumerate(filtered_prods.keys()):
+        if cols[i % 3].button(prod_name, use_container_width=True):
+            st.session_state['selected_product'] = prod_name
+
+    current_product = st.session_state.get('selected_product', None)
+    if current_product and current_product in products:
+        data = products[current_product]
+        printing_cost = (data["weight"] * 0.02) + (data["time"] * 0.02)
+        total_make_cost = printing_cost + data["comp"]
+        suggested_price = (printing_cost / 0.20) + data["comp"] + data["labor"]
+        
+        st.markdown(f"**Active:** {current_product}")
+        c1, c2 = st.columns(2)
+        c1.metric("Cost to Make", f"${total_make_cost:.2f}")
+        c2.metric("Suggested Price", f"${suggested_price:.2f}")
+        
+        default_price = data["target"] if data["target"] > 0 else int(suggested_price)
+        price = st.number_input("Final Sale Price ($)", value=default_price)
+        qty = st.number_input("Quantity", min_value=1, value=1)
+        
+        if st.button("🛒 Add to Cart", type="primary"):
+            st.session_state['cart'].append({"Product": current_product, "Qty": qty, "Sale Price": price, "Total": qty * price})
             st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Products
-    st.markdown("---")
-    sel_cat = st.session_state['selected_cat']
-    filtered_prods = {k: v for k, v in products.items() if v["category"] == sel_cat}
-    
-    # Just list the products for the category
-    for prod_name in filtered_prods.keys():
-        st.button(prod_name, key=f"prod_{prod_name}", use_container_width=True)
 
 with main_col2:
     st.markdown("### 🛒 Checkout")
-    st.write("Cart is ready for items.")
+    if st.session_state['cart']:
+        df = pd.DataFrame(st.session_state['cart'])
+        st.table(df)
+        running_total = df["Total"].sum()
+        pay_type = st.selectbox("Payment", ["Cash", "Venmo", "Square", "PayPal"])
+        fee = 0.0
+        if pay_type != "Cash":
+            add_fee = st.checkbox(f"Add 3% Processing Fee?", value=False)
+            if add_fee: fee = running_total * 0.03
+        st.metric("Total Due", f"${(running_total + fee):.2f}")
+        if st.button("💾 Checkout"):
+            sales_sheet = wb.worksheet("Sales")
+            for item in st.session_state['cart']:
+                sales_sheet.append_row([str(datetime.date.today()), item["Product"], item["Qty"], pay_type, 0, item["Total"], 0, 0])
+            st.session_state['cart'] = []
+            st.rerun()
