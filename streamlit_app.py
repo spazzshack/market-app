@@ -10,8 +10,6 @@ import os
 st.set_page_config(page_title="Spazz Shack", page_icon="🖨️", layout="wide")
 
 # --- DUMMY DATA FOR LAYOUT TESTING ---
-# This allows the app to run immediately. Replace this with your 
-# Google Sheets logic once the sheet is ready.
 def load_inventory():
     return {
         "Toy Car": {"category": "Toys", "weight": 10, "target": 5},
@@ -52,8 +50,6 @@ with main_col1:
                 if st.button(cat, key=f"btn_{cat}", use_container_width=True, type=btn_type):
                     st.session_state['selected_cat'] = cat
                     st.rerun()
-
-    st.markdown("---")
     
     # Display Products for the selected category
     sel_cat = st.session_state['selected_cat']
