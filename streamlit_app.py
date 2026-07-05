@@ -24,9 +24,18 @@ image_code = get_base64_image(IMAGE_PATH)
 # --- CSS FOR BACKGROUND AND PILLS ---
 st.markdown(f"""
     <style>
-    /* ... keep your background and color rules ... */
+    /* --- 1. BACKGROUND AND COLORS --- */
+    .stApp {{
+        background: linear-gradient(rgba(15, 23, 42, 0.90), rgba(15, 23, 42, 0.90)), 
+                    url("data:image/png;base64,{image_code}");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }}
+    h1, h2, h3, p, div {{ color: white !important; }}
     
-    /* Force rounded corners on the buttons, even when pressed */
+    /* --- 2. PILL SHAPE FOR SEGMENTED CONTROL --- */
+    /* Target the button container and buttons */
     button[data-testid="stBaseButton-segmented_control"] {{
         border-radius: 50px !important;
         background-color: rgba(255, 255, 255, 0.1) !important;
@@ -34,11 +43,11 @@ st.markdown(f"""
         transition: all 0.2s ease !important;
     }}
     
-    /* Specifically target the 'pressed' state so it keeps the pill shape */
+    /* Force rounded corners on the pressed/active state */
     button[data-testid="stBaseButton-segmented_control"][aria-pressed="true"] {{
         background-color: rgba(255, 255, 255, 0.4) !important;
         border: 1px solid white !important;
-        border-radius: 50px !important; /* This is the key line */
+        border-radius: 50px !important;
     }}
     </style>
 """, unsafe_allow_html=True)
