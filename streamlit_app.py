@@ -21,7 +21,7 @@ def get_base64_image(image_path):
 
 image_code = get_base64_image(IMAGE_PATH)
 
-# CSS for Background and Perfectly Aligned "Pill" Buttons
+# --- CSS FOR BACKGROUND AND PILLS ---
 st.markdown(f"""
     <style>
     .stApp {{
@@ -33,12 +33,7 @@ st.markdown(f"""
     }}
     h1, h2, h3, p, div {{ color: white !important; }}
     
-    /* --- FORCE HIDE THE DOT --- */
-    div[role="radiogroup"] input[type="radio"] {{
-        display: none !important;
-    }}
-
-    /* --- PILL STYLING --- */
+    /* --- CLEAN PILL STYLING --- */
     div[role="radiogroup"] {{
         display: flex;
         flex-direction: row;
@@ -48,20 +43,22 @@ st.markdown(f"""
         margin-bottom: 25px;
     }}
     div[role="radiogroup"] > label {{
+        display: flex;
+        align-items: center;
         background-color: rgba(255, 255, 255, 0.1);
-        padding: 12px 20px;
+        padding: 10px 20px;
         border-radius: 25px;
         border: 1px solid rgba(255, 255, 255, 0.3);
         cursor: pointer;
         transition: all 0.2s ease;
     }}
-    
-    /* --- LIGHT UP THE PILL WHEN SELECTED --- */
-    /* This specifically targets the label following the checked radio */
-    div[role="radiogroup"] input[type="radio"]:checked + label {{
+    div[role="radiogroup"] input[type="radio"] {{
+        position: absolute;
+        opacity: 0;
+    }}
+    div[role="radiogroup"] input[type="radio"]:checked + div {{
         background-color: rgba(255, 255, 255, 0.4) !important;
         border: 1px solid white !important;
-        box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
     }}
     </style>
 """, unsafe_allow_html=True)
