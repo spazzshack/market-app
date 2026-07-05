@@ -110,9 +110,16 @@ all_prods = products
 main_col1, main_col2 = st.columns([4, 3], gap="large")
 
 with main_col1:
-    st.markdown("### 🛍️ Quick-Add Inventory")
+st.markdown("### 🛍️ Quick-Add Inventory")
     categories = sorted(list(set(p["category"] for p in all_prods.values())))
-    selected_cat = st.radio("Filter by Category", categories, horizontal=True, label_visibility="collapsed")
+    
+    # --- HERE IS THE CHANGE: 1 line becomes 3, but it replaces the old ones ---
+    selected_cat = st.segmented_control(
+        "Filter by Category", 
+        categories, 
+        selection_mode="single",
+        default=categories[0] if categories else None
+    )
     
     filtered_prods = {k: v for k, v in all_prods.items() if v["category"] == selected_cat}
     
