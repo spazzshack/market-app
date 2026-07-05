@@ -34,7 +34,7 @@ st.markdown(f"""
     }}
     h1, h2, h3, p, div {{ color: white !important; }}
 
-    /* 2. Pill Shape and State Overrides */
+    /* 2. Pill Shape */
     button[data-testid="stBaseButton-segmented_control"] {{
         border-radius: 50px !important;
         background-color: rgba(255, 255, 255, 0.1) !important;
@@ -42,11 +42,15 @@ st.markdown(f"""
         transition: all 0.2s ease !important;
     }}
 
-    /* 3. NEW: CUSTOMIZE CLICK GLOW */
-    button[data-testid="stBaseButton-segmented_control"]:focus {{
-        box-shadow: 0 0 0 2px white !important; 
+    /* 3. REMOVE RED GLOW ON CLICK */
+    button[data-testid="stBaseButton-segmented_control"]:focus,
+    button[data-testid="stBaseButton-segmented_control"]:focus-visible,
+    button[data-testid="stBaseButton-segmented_control"]:active {{
+        box-shadow: none !important;
+        outline: none !important;
     }}
 
+    /* 4. Active/Pressed State */
     button[data-testid="stBaseButton-segmented_control"][aria-pressed="true"] {{
         background-color: rgba(255, 255, 255, 0.4) !important;
         border: 1px solid white !important;
