@@ -9,32 +9,9 @@ import os
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Spazz Shack", page_icon="🖨️", layout="wide")
 
-# --- CSS FOR PERFECT 3-WIDE GRID ---
-st.markdown("""
-    <style>
-    /* This container forces 3 equal columns regardless of screen size */
-    .category-grid {
-        display: grid !important;
-        grid-template-columns: repeat(3, 1fr) !important;
-        gap: 10px !important;
-        width: 100% !important;
-        margin-bottom: 20px;
-    }
-    /* Force buttons to fill their grid cells */
-    div[data-testid="stButton"] {
-        width: 100% !important;
-    }
-    div[data-testid="stButton"] button {
-        width: 100% !important;
-        height: 50px !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 # --- DUMMY DATA FOR LAYOUT TESTING ---
+# This allows the app to run immediately. Replace this with your 
+# Google Sheets logic once the sheet is ready.
 def load_inventory():
     return {
         "Toy Car": {"category": "Toys", "weight": 10, "target": 5},
@@ -47,40 +24,45 @@ def load_inventory():
     }
 
 products = load_inventory()
+# Extract unique categories
+categories = sorted(list(set(p["category"] for p in products.values())))
 
-# --- STATE ---
-if 'selected_cat' not in st.session_state: 
-    categories = sorted(list(set(p["category"] for p in products.values())))
+# Initialize State
+if 'selected_cat' not in st.session_state:
     st.session_state['selected_cat'] = categories[0]
+if 'cart' not in st.session_state:
+    st.session_state['cart'] = []
 
 st.title("🖨️ Spazz Shack")
 
 # --- UI LAYOUT ---
-# We keep the main columns here, but we put the grid directly inside main_col1
 main_col1, main_col2 = st.columns([0.6, 0.4])
 
 with main_col1:
     st.markdown("### 🛍️ Quick-Add Inventory")
     
-    # Render the 3-wide Grid
-    categories = sorted(list(set(p["category"] for p in products.values())))
-    st.markdown('<div class="category-grid">', unsafe_allow_html=True)
-    for cat in categories:
-        btn_type = "primary" if st.session_state['selected_cat'] == cat else "secondary"
-        if st.button(cat, key=f"btn_{cat}", type=btn_type):
-            st.session_state['selected_cat'] = cat
-            st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Products
+    # MANUAL 3-COLUMN LOOP
+    # This divides categories into rows of 3 to force uniform alignment
+    for i in range(0, len(categories), 3):
+        row_categories = categories[i:i+3]
+        cols = st.columns(3)
+        for idx, cat in enumerate(row_categories):
+            with cols[idx]:
+                btn_type = "primary" if st.session_state['selected_cat'] == cat else "secondary"
+                if st.button(cat, key=f"btn_{cat}", use_container_width=True, type=btn_type):
+                    st.session_state['selected_cat'] = cat
+                    st.rerun()
+
     st.markdown("---")
-    sel_cat = st.session_state['selected_cat']
-    filtered_prods = {k: v for k, v in products.items() if v["category"] == sel_cat}
     
-    # Just list the products for the category
-    for prod_name in filtered_prods.keys():
-        st.button(prod_name, key=f"prod_{prod_name}", use_container_width=True)
+    # Display Products for the selected category
+    sel_cat = st.session_state['selected_cat']
+    filtered_prods = [name for name, info in products.items() if info["category"] == sel_cat]
+    
+    for prod_name in filtered_prods:
+        if st.button(prod_name, key=f"prod_{prod_name}", use_container_width=True):
+            st.session_state['selected_product'] = prod_name
 
 with main_col2:
     st.markdown("### 🛒 Checkout")
-    st.write("Cart is ready for items.")
+    st.write("Cart is empty.")
