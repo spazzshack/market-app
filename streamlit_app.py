@@ -24,7 +24,7 @@ image_code = get_base64_image(IMAGE_PATH)
 # --- CSS FOR BACKGROUND AND PILLS ---
 st.markdown(f"""
     <style>
-    /* 1. Background (keeping your logo) */
+    /* --- GENERAL APP STYLING --- */
     .stApp {{
         background: linear-gradient(rgba(15, 23, 42, 0.90), rgba(15, 23, 42, 0.90)), 
                     url("data:image/png;base64,{image_code}");
@@ -33,28 +33,24 @@ st.markdown(f"""
         background-attachment: fixed;
     }}
     h1, h2, h3, p, div {{ color: white !important; }}
-
-    /* 2. Pill Shape */
-    button[data-testid="stBaseButton-segmented_control"] {{
+    
+    /* --- PILL SHAPING FOR SEGMENTED CONTROL --- */
+    /* Target the container */
+    div[data-baseweb="segmented-control"] {{
+        background-color: transparent !important;
+    }}
+    
+    /* Force round corners on the buttons */
+    div[data-baseweb="segmented-control"] button {{
         border-radius: 50px !important;
-        background-color: rgba(255, 255, 255, 0.1) !important;
         border: 1px solid rgba(255, 255, 255, 0.3) !important;
-        transition: all 0.2s ease !important;
+        margin: 0 5px !important;
     }}
-
-    /* 3. REMOVE RED GLOW ON CLICK */
-    button[data-testid="stBaseButton-segmented_control"]:focus,
-    button[data-testid="stBaseButton-segmented_control"]:focus-visible,
-    button[data-testid="stBaseButton-segmented_control"]:active {{
-        box-shadow: none !important;
-        outline: none !important;
-    }}
-
-    /* 4. Active/Pressed State */
-    button[data-testid="stBaseButton-segmented_control"][aria-pressed="true"] {{
+    
+    /* Target the active button to match your previous theme */
+    div[data-baseweb="segmented-control"] button[aria-checked="true"] {{
         background-color: rgba(255, 255, 255, 0.4) !important;
         border: 1px solid white !important;
-        border-radius: 50px !important;
     }}
     </style>
 """, unsafe_allow_html=True)
@@ -127,9 +123,22 @@ with main_col1:
     current_product = st.session_state.get('selected_product', None)
     if current_product and current_product in products:
         data = products[current_product]
+       # --- NEW PRICING LOGIC ---
+        parts_markup = 1.25  # 1.25 means 25% markup on components
+        
+        # 1. Calculate base printing cost (Plastic + Machine time)
         printing_cost = (data["weight"] * 0.02) + (data["time"] * 0.02)
-        total_make_cost = printing_cost + data["comp"]
-        suggested_price = (printing_cost / 0.20) + data["comp"] + data["labor"]
+        
+        # 2. Apply 80% margin to the PRINTING part only
+        printing_profit_price = printing_cost / 0.20
+        
+        # 3. Calculate total cost to make (for your display metric)
+        # Includes raw plastic/time, labor, and original component cost
+        total_make_cost = printing_cost + data["labor"] + data["comp"]
+        
+        # 4. Final suggested price
+        # Printing Profit + Labor (no markup) + Components (with markup)
+        suggested_price = printing_profit_price + data["labor"] + (data["comp"] * parts_markup)
         
         st.markdown(f"**Active:** {current_product}")
         c1, c2 = st.columns(2)
