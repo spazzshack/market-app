@@ -94,7 +94,10 @@ def load_inventory():
 if 'cart' not in st.session_state: st.session_state['cart'] = []
 
 # --- UI LAYOUT ---
-st.title("🖨️ Spazz Shack")
+if os.path.exists(IMAGE_PATH):
+    st.image(IMAGE_PATH, width=150) # You can adjust the width to your liking
+else:
+    st.title("Spazz Shack")
 
 products = load_inventory()
 all_prods = products
