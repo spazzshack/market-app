@@ -21,10 +21,9 @@ def get_base64_image(image_path):
 
 image_code = get_base64_image(IMAGE_PATH)
 
-# --- CSS FOR BACKGROUND AND PILLS ---
+# --- CSS STYLING ---
 st.markdown(f"""
     <style>
-    /* --- GENERAL APP STYLING --- */
     .stApp {{
         background: linear-gradient(rgba(15, 23, 42, 0.90), rgba(15, 23, 42, 0.90)), 
                     url("data:image/png;base64,{image_code}");
@@ -34,20 +33,16 @@ st.markdown(f"""
     }}
     h1, h2, h3, p, div {{ color: white !important; }}
     
-    /* --- PILL SHAPING FOR SEGMENTED CONTROL --- */
-    /* Target the container */
-    div[data-baseweb="segmented-control"] {{
-        background-color: transparent !important;
-    }}
+    /* Remove extra space above headers */
+    h1 {{ padding-top: 0px !important; margin-top: 0px !important; }}
     
-    /* Force round corners on the buttons */
+    /* Pill shaping for segmented control */
+    div[data-baseweb="segmented-control"] {{ background-color: transparent !important; }}
     div[data-baseweb="segmented-control"] button {{
         border-radius: 50px !important;
         border: 1px solid rgba(255, 255, 255, 0.3) !important;
         margin: 0 5px !important;
     }}
-    
-    /* Target the active button to match your previous theme */
     div[data-baseweb="segmented-control"] button[aria-checked="true"] {{
         background-color: rgba(255, 255, 255, 0.4) !important;
         border: 1px solid white !important;
@@ -73,7 +68,6 @@ def connect_to_google_sheets():
 
 wb = connect_to_google_sheets()
 
-# --- LOAD INVENTORY FUNCTION ---
 @st.cache_data(ttl=60)
 def load_inventory():
     if not wb: return {}
@@ -90,62 +84,38 @@ def load_inventory():
         "category": item.get("Category", "General")
     } for item in data}
 
-# --- INITIALIZE STATE ---
 if 'cart' not in st.session_state: st.session_state['cart'] = []
 
-# --- UI LAYOUT ---
-# --- NEW HEADER LAYOUT ---
-header_col1, header_col2 = st.columns([1, 5])
+# --- CENTERED HEADER ---
+st.markdown(f"""
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 20px;">
+        <img src="data:image/png;base64,{image_code}" width="120">
+        <h1>Spazz Shack</h1>
+    </div>
+""", unsafe_allow_html=True)
 
-with header_col1:
-    if os.path.exists(IMAGE_PATH):
-        st.image(IMAGE_PATH, width=80) # Adjust width to make it smaller
-
-with header_col2:
-    st.markdown("<br><h1>Spazz Shack</h1>", unsafe_allow_html=True)
-
-products = load_inventory()
-all_prods = products
-
+# --- APP CONTENT ---
+all_prods = load_inventory()
 main_col1, main_col2 = st.columns([4, 3], gap="large")
 
 with main_col1:
     st.markdown("### 🛍️ Quick-Add Inventory")
     categories = sorted(list(set(p["category"] for p in all_prods.values())))
-    
-    # --- HERE IS THE CHANGE: 1 line becomes 3, but it replaces the old ones ---
-    selected_cat = st.segmented_control(
-        "Filter by Category", 
-        categories, 
-        selection_mode="single",
-        default=categories[0] if categories else None
-    )
+    selected_cat = st.segmented_control("Filter by Category", categories, selection_mode="single", default=categories[0] if categories else None)
     
     filtered_prods = {k: v for k, v in all_prods.items() if v["category"] == selected_cat}
-    
     cols = st.columns(3)
     for i, prod_name in enumerate(filtered_prods.keys()):
         if cols[i % 3].button(prod_name, use_container_width=True):
             st.session_state['selected_product'] = prod_name
 
     current_product = st.session_state.get('selected_product', None)
-    if current_product and current_product in products:
-        data = products[current_product]
-       # --- NEW PRICING LOGIC ---
-        parts_markup = 1.25  # 1.25 means 25% markup on components
-        
-        # 1. Calculate base printing cost (Plastic + Machine time)
+    if current_product and current_product in all_prods:
+        data = all_prods[current_product]
+        parts_markup = 1.25
         printing_cost = (data["weight"] * 0.02) + (data["time"] * 0.02)
-        
-        # 2. Apply 80% margin to the PRINTING part only
         printing_profit_price = printing_cost / 0.20
-        
-        # 3. Calculate total cost to make (for your display metric)
-        # Includes raw plastic/time, labor, and original component cost
         total_make_cost = printing_cost + data["labor"] + data["comp"]
-        
-        # 4. Final suggested price
-        # Printing Profit + Labor (no markup) + Components (with markup)
         suggested_price = printing_profit_price + data["labor"] + (data["comp"] * parts_markup)
         
         st.markdown(f"**Active:** {current_product}")
@@ -170,7 +140,7 @@ with main_col2:
         pay_type = st.selectbox("Payment", ["Cash", "Venmo", "Square", "PayPal"])
         fee = 0.0
         if pay_type != "Cash":
-            add_fee = st.checkbox(f"Add 3% Processing Fee?", value=False)
+            add_fee = st.checkbox("Add 3% Processing Fee?", value=False)
             if add_fee: fee = running_total * 0.03
         st.metric("Total Due", f"${(running_total + fee):.2f}")
         if st.button("💾 Checkout"):
