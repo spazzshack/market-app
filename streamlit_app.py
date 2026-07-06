@@ -94,10 +94,15 @@ def load_inventory():
 if 'cart' not in st.session_state: st.session_state['cart'] = []
 
 # --- UI LAYOUT ---
-if os.path.exists(IMAGE_PATH):
-    st.image(IMAGE_PATH, width=150) # You can adjust the width to your liking
-else:
-    st.title("Spazz Shack")
+# --- NEW HEADER LAYOUT ---
+header_col1, header_col2 = st.columns([1, 5])
+
+with header_col1:
+    if os.path.exists(IMAGE_PATH):
+        st.image(IMAGE_PATH, width=80) # Adjust width to make it smaller
+
+with header_col2:
+    st.markdown("<br><h1>Spazz Shack</h1>", unsafe_allow_html=True)
 
 products = load_inventory()
 all_prods = products
