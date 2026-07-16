@@ -1,5 +1,6 @@
 import streamlit as st
 import datetime
+from zoneinfo import ZoneInfo
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -21,9 +22,10 @@ def get_base64_image(image_path):
 
 image_code = get_base64_image(IMAGE_PATH)
 
-# --- CSS STYLING ---
+# --- CSS FOR BACKGROUND AND PILLS ---
 st.markdown(f"""
     <style>
+    /* --- GENERAL APP STYLING --- */
     .stApp {{
         background: linear-gradient(rgba(15, 23, 42, 0.90), rgba(15, 23, 42, 0.90)), 
                     url("data:image/png;base64,{image_code}");
@@ -33,16 +35,20 @@ st.markdown(f"""
     }}
     h1, h2, h3, p, div {{ color: white !important; }}
     
-    /* Remove extra space above headers */
-    h1 {{ padding-top: 0px !important; margin-top: 0px !important; }}
+    /* --- PILL SHAPING FOR SEGMENTED CONTROL --- */
+    /* Target the container */
+    div[data-baseweb="segmented-control"] {{
+        background-color: transparent !important;
+    }}
     
-    /* Pill shaping for segmented control */
-    div[data-baseweb="segmented-control"] {{ background-color: transparent !important; }}
+    /* Force round corners on the buttons */
     div[data-baseweb="segmented-control"] button {{
         border-radius: 50px !important;
         border: 1px solid rgba(255, 255, 255, 0.3) !important;
         margin: 0 5px !important;
     }}
+    
+    /* Target the active button to match your previous theme */
     div[data-baseweb="segmented-control"] button[aria-checked="true"] {{
         background-color: rgba(255, 255, 255, 0.4) !important;
         border: 1px solid white !important;
@@ -68,6 +74,7 @@ def connect_to_google_sheets():
 
 wb = connect_to_google_sheets()
 
+# --- LOAD INVENTORY FUNCTION ---
 @st.cache_data(ttl=60)
 def load_inventory():
     if not wb: return {}
@@ -84,38 +91,54 @@ def load_inventory():
         "category": item.get("Category", "General")
     } for item in data}
 
+# --- INITIALIZE STATE ---
 if 'cart' not in st.session_state: st.session_state['cart'] = []
 
-# --- CENTERED HEADER ---
-st.markdown(f"""
-    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 20px;">
-        <img src="data:image/png;base64,{image_code}" width="120">
-        <h1>Spazz Shack</h1>
-    </div>
-""", unsafe_allow_html=True)
+# --- UI LAYOUT ---
+st.title("🖨️ Spazz Shack")
 
-# --- APP CONTENT ---
-all_prods = load_inventory()
+products = load_inventory()
+all_prods = products
+
 main_col1, main_col2 = st.columns([4, 3], gap="large")
 
 with main_col1:
     st.markdown("### 🛍️ Quick-Add Inventory")
     categories = sorted(list(set(p["category"] for p in all_prods.values())))
-    selected_cat = st.segmented_control("Filter by Category", categories, selection_mode="single", default=categories[0] if categories else None)
+    
+    # --- HERE IS THE CHANGE: 1 line becomes 3, but it replaces the old ones ---
+    selected_cat = st.segmented_control(
+        "Filter by Category", 
+        categories, 
+        selection_mode="single",
+        default=categories[0] if categories else None
+    )
     
     filtered_prods = {k: v for k, v in all_prods.items() if v["category"] == selected_cat}
+    
     cols = st.columns(3)
     for i, prod_name in enumerate(filtered_prods.keys()):
         if cols[i % 3].button(prod_name, use_container_width=True):
             st.session_state['selected_product'] = prod_name
 
     current_product = st.session_state.get('selected_product', None)
-    if current_product and current_product in all_prods:
-        data = all_prods[current_product]
-        parts_markup = 1.25
+    if current_product and current_product in products:
+        data = products[current_product]
+       # --- NEW PRICING LOGIC ---
+        parts_markup = 1.25  # 1.25 means 25% markup on components
+        
+        # 1. Calculate base printing cost (Plastic + Machine time)
         printing_cost = (data["weight"] * 0.02) + (data["time"] * 0.02)
+        
+        # 2. Apply 80% margin to the PRINTING part only
         printing_profit_price = printing_cost / 0.20
+        
+        # 3. Calculate total cost to make (for your display metric)
+        # Includes raw plastic/time, labor, and original component cost
         total_make_cost = printing_cost + data["labor"] + data["comp"]
+        
+        # 4. Final suggested price
+        # Printing Profit + Labor (no markup) + Components (with markup)
         suggested_price = printing_profit_price + data["labor"] + (data["comp"] * parts_markup)
         
         st.markdown(f"**Active:** {current_product}")
@@ -140,12 +163,42 @@ with main_col2:
         pay_type = st.selectbox("Payment", ["Cash", "Venmo", "Square", "PayPal"])
         fee = 0.0
         if pay_type != "Cash":
-            add_fee = st.checkbox("Add 3% Processing Fee?", value=False)
+            add_fee = st.checkbox(f"Add 3% Processing Fee?", value=False)
             if add_fee: fee = running_total * 0.03
         st.metric("Total Due", f"${(running_total + fee):.2f}")
-        if st.button("💾 Checkout"):
+if st.button("💾 Checkout"):
+            # ... (your audio code)
+            
             sales_sheet = wb.worksheet("Sales")
             for item in st.session_state['cart']:
-                sales_sheet.append_row([str(datetime.date.today()), item["Product"], item["Qty"], pay_type, 0, item["Total"], 0, 0])
+                # 1. Get the product info from your inventory dictionary
+                prod_data = products[item["Product"]]
+                
+                # 2. Calculate the cost for ONE item
+                cost_per_unit = (prod_data["weight"] * 0.02) + (prod_data["time"] * 0.02) + prod_data["comp"] + prod_data["labor"]
+                
+                # 3. Calculate total cost for the quantity sold
+                total_row_cost = round(item["Qty"] * cost_per_unit, 2)
+                
+                # 4. Calculate total revenue (what the customer paid)
+                total_rev = item["Total"]
+                
+                # 5. Calculate profit (Revenue - Cost - any fees)
+                item_fee = (fee / len(st.session_state['cart'])) if fee > 0 else 0
+                profit = total_rev - total_row_cost - item_fee
+                
+                # 6. Save to sheet with the REAL numbers
+                sales_sheet.append_row([
+                    str(datetime.datetime.now(ZoneInfo("America/Chicago")).date()), 
+                    item["Product"], 
+                    item["Qty"], 
+                    pay_type, 
+                    total_row_cost,    # This replaces the first 0
+                    total_rev, 
+                    round(profit, 2),  # This replaces the second 0
+                    round(item_fee, 2)
+                ])
+            
             st.session_state['cart'] = []
+            st.balloons()
             st.rerun()
